@@ -5,768 +5,388 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Wire Mesh Calculator</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg: #f4f6f9;
-      --surface: #ffffff;
-      --border: #e2e8f0;
-      --text: #0f172a;
-      --text-muted: #64748b;
-      --text-faint: #94a3b8;
-      --blue: #2563eb;
-      --blue-light: #eff6ff;
-      --blue-border: #bfdbfe;
-      --green: #16a34a;
-      --green-light: #f0fdf4;
-      --green-border: #bbf7d0;
-      --amber: #b45309;
-      --amber-light: #fffbeb;
-      --amber-border: #fde68a;
-      --red: #dc2626;
-      --red-light: #fef2f2;
-      --red-border: #fecaca;
-      --purple: #7c3aed;
-      --orange: #ea580c;
-      --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
-    }
-
-    body {
-      font-family: 'DM Sans', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      padding: 24px 16px;
-    }
-
-    .page { max-width: 1120px; margin: 0 auto; }
-
-    .page-header {
-      margin-bottom: 28px;
-      padding-bottom: 20px;
-      border-bottom: 1px solid var(--border);
-    }
-    .page-header h1 { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
-    .page-header p  { margin-top: 6px; font-size: 0.875rem; color: var(--text-muted); }
-
-    .dashboard {
-      display: grid;
-      grid-template-columns: 350px 1fr;
-      gap: 24px;
-      align-items: start;
-    }
-
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      box-shadow: var(--shadow);
-    }
-    .card-header { padding: 20px 24px 0; display: flex; align-items: center; gap: 8px; }
-    .card-header h2 { font-size: 1rem; font-weight: 600; color: var(--text); }
-    .card-header svg { width: 18px; height: 18px; color: var(--text-muted); flex-shrink: 0; }
-    .card-body { padding: 20px 24px 24px; }
-
-    .input-group { margin-bottom: 14px; }
-    .input-group label { display: block; font-size: 0.8125rem; font-weight: 500; color: #374151; margin-bottom: 5px; }
-    .input-group input,
-    .input-group select {
-      width: 100%; height: 40px; padding: 0 12px;
-      font-size: 0.875rem; font-family: 'DM Sans', sans-serif;
-      color: var(--text); background: var(--surface);
-      border: 1px solid #d1d5db; border-radius: 8px;
-      outline: none; transition: border-color .15s, box-shadow .15s;
-      appearance: none; -webkit-appearance: none;
-    }
-    .input-group input::placeholder { color: #9ca3af; }
-    .input-group input:focus, .input-group select:focus {
-      border-color: var(--blue);
-      box-shadow: 0 0 0 3px rgba(59,130,246,.12);
-    }
-    .input-group input:disabled { background: #f8fafc; color: #94a3b8; cursor: not-allowed; }
-    .select-wrap { position: relative; }
-    .select-wrap::after {
-      content: "▾"; position: absolute; right: 12px; top: 50%;
-      transform: translateY(-50%); color: var(--text-muted); font-size: .75rem; pointer-events: none;
-    }
-    .hint { margin-top: 4px; font-size: 0.72rem; color: var(--text-faint); font-style: italic; }
-
-    /* Weave type info pill */
-    .weave-info {
-      display: none;
-      margin-top: 6px;
-      font-size: 0.75rem;
-      padding: 6px 10px;
-      border-radius: 6px;
-      font-weight: 500;
-      line-height: 1.4;
-    }
-    .weave-info.show { display: block; }
-    .weave-info.plain  { background: var(--blue-light);  color: var(--blue);  border: 1px solid var(--blue-border); }
-    .weave-info.twill  { background: var(--amber-light); color: var(--amber); border: 1px solid var(--amber-border); }
-    .weave-info.dutch  { background: var(--green-light); color: var(--green); border: 1px solid var(--green-border); }
-
-    .btn-row { display: flex; gap: 10px; margin-top: 8px; }
-    .btn {
-      height: 40px; border-radius: 8px; font-size: 0.875rem; font-weight: 600;
-      font-family: 'DM Sans', sans-serif; cursor: pointer; border: none;
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      transition: background .15s, box-shadow .15s, transform .1s;
-    }
-    .btn-primary { flex: 1; background: var(--blue); color: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
-    .btn-primary:hover { background: #1d4ed8; box-shadow: 0 4px 12px rgba(37,99,235,.3); }
-    .btn-primary:active { transform: translateY(1px); }
-    .btn-outline { padding: 0 18px; background: var(--surface); color: #374151; border: 1px solid #d1d5db; }
-    .btn-outline:hover { background: var(--bg); }
-
-    /* ── SAMPLE TESTS ── */
-    .samples-section { margin-top: 20px; }
-    .samples-label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--text-faint); margin-bottom: 10px; }
-    .sample-group-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin: 10px 0 6px; }
-    .sample-btn {
-      display: flex; align-items: center; justify-content: space-between;
-      width: 100%; padding: 9px 12px; margin-bottom: 6px;
-      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
-      font-size: 0.78rem; font-family: 'DM Sans', sans-serif; cursor: pointer;
-      transition: background .12s, border-color .12s;
-      text-align: left;
-    }
-    .sample-btn:hover { background: var(--blue-light); border-color: var(--blue-border); }
-    .sample-btn .s-name { font-weight: 600; color: #1e3a5f; font-size: 0.78rem; }
-    .sample-btn .s-params { color: var(--text-muted); font-size: 0.7rem; margin-top: 2px; font-family: 'DM Mono', monospace; }
-    .sample-badge {
-      font-size: 0.65rem; font-weight: 700; padding: 2px 7px;
-      border-radius: 99px; flex-shrink: 0; margin-left: 8px; letter-spacing: .04em;
-    }
-    .badge-plain       { background: var(--blue-light);  color: var(--blue); }
-    .badge-twill       { background: var(--amber-light); color: var(--amber); }
-    .badge-plain-dutch { background: var(--green-light); color: var(--green); }
-    .badge-twill-dutch { background: #f5f3ff; color: #6d28d9; }
-
-    /* ── VERDICT BANNER ── */
-    .verdict-banner {
-      display: none;
-      align-items: flex-start;
-      gap: 12px;
-      border-radius: 10px;
-      padding: 14px 18px;
-      font-size: 0.875rem;
-      font-weight: 600;
-      animation: rollUp 0.35s ease forwards;
-    }
-    .verdict-banner svg { width: 20px; height: 20px; flex-shrink: 0; margin-top: 1px; }
-    .verdict-plain       { background: var(--blue-light);  border: 1px solid var(--blue-border);  color: var(--blue); }
-    .verdict-twill       { background: var(--amber-light); border: 1px solid var(--amber-border); color: var(--amber); }
-    .verdict-plain_dutch { background: var(--green-light); border: 1px solid var(--green-border); color: var(--green); }
-    .verdict-twill_dutch { background: #f5f3ff; border: 1px solid #ddd6fe; color: #6d28d9; }
-    .verdict-body .v-title  { font-size: 0.875rem; font-weight: 700; }
-    .verdict-body .v-detail { font-size: 0.775rem; font-weight: 400; margin-top: 4px; color: inherit; opacity: .85; line-height: 1.5; }
-
-    /* ── RESULT GRID ── */
-    .result-panel { display: flex; flex-direction: column; gap: 16px; }
-    .result-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-
-    .stat-card {
-      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-      padding: 20px; display: flex; align-items: center; justify-content: space-between;
-      box-shadow: var(--shadow);
-    }
-    .stat-card .label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
-    .stat-card .value { font-size: 1.875rem; font-weight: 700; color: var(--text); margin: 5px 0 3px; line-height: 1; font-family: 'DM Mono', monospace; }
-    .stat-card .unit  { font-size: 0.72rem; color: var(--text-faint); }
-    .stat-icon { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .stat-icon svg { width: 20px; height: 20px; }
-    .icon-blue   { background: var(--blue-light);  color: var(--blue); }
-    .icon-green  { background: var(--green-light); color: var(--green); }
-    .icon-purple { background: #faf5ff; color: var(--purple); }
-    .icon-orange { background: #fff7ed; color: var(--orange); }
-
-    /* ── RATIO CARD ── */
-    .ratio-card {
-      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-      padding: 20px; box-shadow: var(--shadow);
-    }
-    .ratio-card .rc-title { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: 12px; }
-    .bar-row-label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--text-faint); margin-bottom: 5px; }
-    .ratio-bar-wrap { background: #f1f5f9; border-radius: 99px; height: 10px; overflow: hidden; position: relative; }
-    .ratio-bar-fill { height: 100%; border-radius: 99px; transition: width .8s cubic-bezier(.22,.68,0,1.2), background .4s; }
-    .ratio-markers { display: flex; justify-content: space-between; margin-top: 4px; font-size: 0.68rem; color: var(--text-faint); font-family: 'DM Mono', monospace; }
-    .weft-bar-section { margin-top: 14px; }
-    .ratio-values { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 16px; }
-    .ratio-val { text-align: center; }
-    .ratio-val .rv-n { font-size: 1.125rem; font-weight: 700; color: var(--text); font-family: 'DM Mono', monospace; }
-    .ratio-val .rv-l { font-size: 0.68rem; color: var(--text-muted); margin-top: 2px; }
-
-    @keyframes rollUp {
-      0%   { transform: translateY(40%); opacity: 0; }
-      100% { transform: translateY(0);   opacity: 1; }
-    }
-    .value.animating { animation: rollUp 0.7s cubic-bezier(.22,.68,0,1.2) forwards; }
-
-    /* ── SUMMARY CARD ── */
-    .summary-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
-    .summary-card .s-header { padding: 16px 20px 0; font-size: .875rem; font-weight: 600; color: var(--text); }
-    .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 14px 20px 20px; }
-    .summary-item p:first-child { font-size: .7rem; color: var(--text-muted); margin-bottom: 3px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
-    .summary-item p:last-child  { font-size: .875rem; font-weight: 600; color: var(--text); font-family: 'DM Mono', monospace; }
-
-    @media (max-width: 900px) { .dashboard { grid-template-columns: 1fr; } }
-    @media (max-width: 500px) {
-      .result-cards { grid-template-columns: 1fr; }
-      .summary-grid { grid-template-columns: repeat(2,1fr); }
-      .ratio-values { grid-template-columns: repeat(2,1fr); }
-    }
-  </style>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
 <div class="page">
 
+  <!-- ── PAGE HEADER ── -->
   <div class="page-header">
-    <h1>Wire Mesh Calculator</h1>
-    <p>Opening · Thickness · Open Area / Constant · Weight — with automatic Plain / Twill / Dutch weave feasibility check.</p>
+    <div class="page-header-text">
+      <h1>Wire Mesh Calculator</h1>
+      <p>Opening · Thickness · Open Area / Constant · Weight — with automatic Plain / Twill / Dutch weave feasibility check.</p>
+    </div>
+    <button class="mode-toggle-btn" id="modeToggleBtn" onclick="toggleMode()">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path d="M4 4h16M4 12h10M4 20h7"/><path d="M18 8l4 4-4 4"/>
+      </svg>
+      Reverse Calculator
+    </button>
   </div>
 
-  <div class="dashboard">
+  <!-- ── MODE TABS ── -->
+  <div class="mode-indicator">
+    <button class="mode-tab active" id="tabForward" onclick="switchTab('forward')">
+      📐 Standard — mesh + dia → opening
+    </button>
+    <button class="mode-tab" id="tabReverse" onclick="switchTab('reverse')">
+      🔁 Reverse — opening → mesh or dia
+    </button>
+  </div>
 
-    <!-- ── INPUT PANEL ── -->
-    <div class="card">
-      <div class="card-header">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/>
-          <line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/>
-        </svg>
-        <h2>Input Parameters</h2>
-      </div>
-      <div class="card-body">
+  <!-- ══════════════════════════════════════ -->
+  <!-- ── PANEL A: FORWARD CALCULATOR ── -->
+  <!-- ══════════════════════════════════════ -->
+  <div class="panel" id="panelForward">
+    <div class="dashboard">
 
-        <div class="input-group">
-          <label for="weaveType">Weave Type</label>
-          <div class="select-wrap">
-            <select id="weaveType" onchange="onWeaveChange()">
-              <option value="plain">Plain Weave</option>
-              <option value="twill">Twill Weave</option>
-              <option value="plain_dutch">Plain Dutch Weave</option>
-              <option value="twill_dutch">Twill Dutch Weave</option>
-            </select>
+      <!-- INPUT PANEL -->
+      <div class="card">
+        <div class="card-header">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <rect x="4" y="2" width="16" height="20" rx="2"/>
+            <line x1="8" y1="6" x2="16" y2="6"/>
+            <line x1="8" y1="10" x2="16" y2="10"/>
+            <line x1="8" y1="14" x2="12" y2="14"/>
+          </svg>
+          <h2>Input Parameters</h2>
+        </div>
+        <div class="card-body">
+
+          <div class="input-group">
+            <label for="weaveType">Weave Type</label>
+            <div class="select-wrap">
+              <select id="weaveType" onchange="onWeaveChange()">
+                <option value="plain">Plain Weave</option>
+                <option value="twill">Twill Weave</option>
+                <option value="plain_dutch">Plain Dutch Weave</option>
+                <option value="twill_dutch">Twill Dutch Weave</option>
+              </select>
+            </div>
+            <div class="weave-info plain" id="weaveInfoPlain">Over-1 Under-1. Square mesh. Requires d/p ≤ 0.5.</div>
+            <div class="weave-info twill" id="weaveInfoTwill">Over-2 Under-2. Square mesh. Handles d/p up to ~0.67.</div>
+            <div class="weave-info dutch" id="weaveInfoPlainDutch">Coarse warp + fine weft (packed). Warp d/p ≤ 0.5.</div>
+            <div class="weave-info dutch" id="weaveInfoTwillDutch">Coarse warp + very fine weft. Warp d/p > 0.5. Twill crimp on warp.</div>
           </div>
-          <div class="weave-info plain" id="weaveInfoPlain">Over-1 Under-1. Square mesh. Requires d/p ≤ 0.5.</div>
-          <div class="weave-info twill" id="weaveInfoTwill">Over-2 Under-2. Square mesh. Handles d/p up to ~0.67.</div>
-          <div class="weave-info dutch" id="weaveInfoPlainDutch">Coarse warp + fine weft (packed). Warp d/p ≤ 0.5.</div>
-          <div class="weave-info dutch" id="weaveInfoTwillDutch">Coarse warp + very fine weft. Warp d/p > 0.5. Twill crimp on warp.</div>
-        </div>
 
-        <div class="input-group">
-          <label for="warpMesh" id="labelWarpMesh">Warp Mesh (wires/inch)</label>
-          <input type="number" id="warpMesh" placeholder="e.g. 50" oninput="syncFields('warpMesh')" />
-        </div>
+          <div class="input-group">
+            <label for="warpMesh" id="labelWarpMesh">Warp Mesh (wires/inch)</label>
+            <input type="number" id="warpMesh" placeholder="e.g. 50" oninput="syncFields('warpMesh')" />
+          </div>
 
-        <div class="input-group">
-          <label for="weftMesh" id="labelWeftMesh">Weft Mesh (wires/inch)</label>
-          <input type="number" id="weftMesh" placeholder="e.g. 50" oninput="syncFields('weftMesh')" />
-          <div class="hint" id="weftMeshHint"></div>
-        </div>
+          <div class="input-group">
+            <label for="weftMesh" id="labelWeftMesh">Weft Mesh (wires/inch)</label>
+            <input type="number" id="weftMesh" placeholder="e.g. 50" oninput="syncFields('weftMesh')" />
+            <div class="hint" id="weftMeshHint"></div>
+          </div>
 
-        <div class="input-group">
-          <label for="warpDia" id="labelWarpDia">Warp Wire Diameter D (mm)</label>
-          <input type="number" step="0.001" id="warpDia" placeholder="e.g. 0.200" oninput="syncFields('warpDia')" />
-        </div>
+          <div class="input-group">
+            <label for="warpDia" id="labelWarpDia">Warp Wire Diameter D (mm)</label>
+            <input type="number" step="0.001" id="warpDia" placeholder="e.g. 0.200" oninput="syncFields('warpDia')" />
+          </div>
 
-        <div class="input-group">
-          <label for="weftDia" id="labelWeftDia">Weft Wire Diameter d (mm)</label>
-          <input type="number" step="0.001" id="weftDia" placeholder="e.g. 0.200" oninput="syncFields('weftDia')" />
-          <div class="hint" id="weftDiaHint"></div>
-        </div>
+          <div class="input-group">
+            <label for="weftDia" id="labelWeftDia">Weft Wire Diameter d (mm)</label>
+            <input type="number" step="0.001" id="weftDia" placeholder="e.g. 0.200" oninput="syncFields('weftDia')" />
+            <div class="hint" id="weftDiaHint"></div>
+          </div>
 
-        <div class="btn-row">
-          <button class="btn btn-primary" onclick="calculateMesh()">Calculate</button>
-          <button class="btn btn-outline" onclick="resetForm()">Reset</button>
-        </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="calculateMesh()">Calculate</button>
+            <button class="btn btn-outline" onclick="resetForm()">Reset</button>
+          </div>
 
-        <!-- ── SAMPLE TEST CASES ── -->
-        <div class="samples-section">
-          <div class="samples-label">Sample Test Cases</div>
+          <!-- SAMPLE TEST CASES -->
+          <div class="samples-section">
+            <div class="samples-label">Sample Test Cases</div>
 
-          <div class="sample-group-label">Plain Weave</div>
-          <button class="sample-btn" onclick="loadSample('plain_ok')">
-            <div>
-              <div class="s-name">✅ Plain — Feasible</div>
-              <div class="s-params">Mesh 50 | D=0.200 mm | d/p=0.394</div>
-            </div>
-            <span class="sample-badge badge-plain">PLAIN</span>
-          </button>
-          <button class="sample-btn" onclick="loadSample('fine_plain')">
-            <div>
-              <div class="s-name">✅ Fine Plain Weave</div>
-              <div class="s-params">Mesh 200 | D=0.053 mm | d/p=0.417</div>
-            </div>
-            <span class="sample-badge badge-plain">PLAIN</span>
-          </button>
+            <div class="sample-group-label">Plain Weave</div>
+            <button class="sample-btn" onclick="loadSample('plain_ok')">
+              <div>
+                <div class="s-name">✅ Plain — Feasible</div>
+                <div class="s-params">Mesh 50 | D=0.200 mm | d/p=0.394</div>
+              </div>
+              <span class="sample-badge badge-plain">PLAIN</span>
+            </button>
+            <button class="sample-btn" onclick="loadSample('fine_plain')">
+              <div>
+                <div class="s-name">✅ Fine Plain Weave</div>
+                <div class="s-params">Mesh 200 | D=0.053 mm | d/p=0.417</div>
+              </div>
+              <span class="sample-badge badge-plain">PLAIN</span>
+            </button>
 
-          <div class="sample-group-label">Twill Weave</div>
-          <button class="sample-btn" onclick="loadSample('twill_needed')">
-            <div>
-              <div class="s-name">⚠️ Twill Required</div>
-              <div class="s-params">Mesh 50 | D=0.300 mm | d/p=0.591</div>
-            </div>
-            <span class="sample-badge badge-twill">TWILL</span>
-          </button>
-          <button class="sample-btn" onclick="loadSample('coarse_twill')">
-            <div>
-              <div class="s-name">⚠️ Coarse Twill</div>
-              <div class="s-params">Mesh 30 | D=0.500 mm | d/p=0.591</div>
-            </div>
-            <span class="sample-badge badge-twill">TWILL</span>
-          </button>
+            <div class="sample-group-label">Twill Weave</div>
+            <button class="sample-btn" onclick="loadSample('twill_needed')">
+              <div>
+                <div class="s-name">⚠️ Twill Required</div>
+                <div class="s-params">Mesh 50 | D=0.300 mm | d/p=0.591</div>
+              </div>
+              <span class="sample-badge badge-twill">TWILL</span>
+            </button>
+            <button class="sample-btn" onclick="loadSample('coarse_twill')">
+              <div>
+                <div class="s-name">⚠️ Coarse Twill</div>
+                <div class="s-params">Mesh 30 | D=0.500 mm | d/p=0.591</div>
+              </div>
+              <span class="sample-badge badge-twill">TWILL</span>
+            </button>
 
-          <div class="sample-group-label">Plain Dutch Weave</div>
-          <button class="sample-btn" onclick="loadSample('plain_dutch')">
-            <div>
-              <div class="s-name">🟢 Plain Dutch</div>
-              <div class="s-params">Warp 20×Weft 120 | D=0.400 d=0.160 mm</div>
-            </div>
-            <span class="sample-badge badge-plain-dutch">P-DUTCH</span>
-          </button>
-          <button class="sample-btn" onclick="loadSample('plain_dutch2')">
-            <div>
-              <div class="s-name">🟢 Plain Dutch #2</div>
-              <div class="s-params">Warp 12×Weft 64 | D=0.560 d=0.200 mm</div>
-            </div>
-            <span class="sample-badge badge-plain-dutch">P-DUTCH</span>
-          </button>
+            <div class="sample-group-label">Plain Dutch Weave</div>
+            <button class="sample-btn" onclick="loadSample('plain_dutch')">
+              <div>
+                <div class="s-name">🟢 Plain Dutch</div>
+                <div class="s-params">Warp 20×Weft 120 | D=0.400 d=0.160 mm</div>
+              </div>
+              <span class="sample-badge badge-plain-dutch">P-DUTCH</span>
+            </button>
+            <button class="sample-btn" onclick="loadSample('plain_dutch2')">
+              <div>
+                <div class="s-name">🟢 Plain Dutch #2</div>
+                <div class="s-params">Warp 12×Weft 64 | D=0.560 d=0.200 mm</div>
+              </div>
+              <span class="sample-badge badge-plain-dutch">P-DUTCH</span>
+            </button>
 
-          <div class="sample-group-label">Twill Dutch Weave</div>
-          <button class="sample-btn" onclick="loadSample('twill_dutch')">
-            <div>
-              <div class="s-name">🟣 Twill Dutch</div>
-              <div class="s-params">Warp 24×Weft 110 | D=0.630 d=0.200 mm</div>
-            </div>
-            <span class="sample-badge badge-twill-dutch">T-DUTCH</span>
-          </button>
-          <button class="sample-btn" onclick="loadSample('twill_dutch2')">
-            <div>
-              <div class="s-name">🟣 Twill Dutch #2</div>
-              <div class="s-params">Warp 16×Weft 80 | D=0.800 d=0.250 mm</div>
-            </div>
-            <span class="sample-badge badge-twill-dutch">T-DUTCH</span>
-          </button>
-        </div>
+            <div class="sample-group-label">Twill Dutch Weave</div>
+            <button class="sample-btn" onclick="loadSample('twill_dutch')">
+              <div>
+                <div class="s-name">🟣 Twill Dutch</div>
+                <div class="s-params">Warp 24×Weft 110 | D=0.630 d=0.200 mm</div>
+              </div>
+              <span class="sample-badge badge-twill-dutch">T-DUTCH</span>
+            </button>
+            <button class="sample-btn" onclick="loadSample('twill_dutch2')">
+              <div>
+                <div class="s-name">🟣 Twill Dutch #2</div>
+                <div class="s-params">Warp 16×Weft 80 | D=0.800 d=0.250 mm</div>
+              </div>
+              <span class="sample-badge badge-twill-dutch">T-DUTCH</span>
+            </button>
+          </div>
 
-      </div>
-    </div>
-
-    <!-- ── RESULTS PANEL ── -->
-    <div class="result-panel">
-
-      <!-- Weave Feasibility Verdict -->
-      <div class="verdict-banner" id="verdictBanner">
-        <svg id="verdictIcon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"></svg>
-        <div class="verdict-body">
-          <div class="v-title" id="verdictTitle"></div>
-          <div class="v-detail" id="verdictDetail"></div>
         </div>
       </div>
 
-      <!-- d/p Ratio Visualiser -->
-      <div class="ratio-card" id="ratioCard" style="display:none;">
-        <div class="rc-title" id="ratioCardTitle">Weave Feasibility — d/p Ratio</div>
+      <!-- RESULTS PANEL -->
+      <div class="result-panel">
 
-        <div class="bar-row-label" id="warpBarLabel">Warp d/p</div>
-        <div class="ratio-bar-wrap">
-          <div class="ratio-bar-fill" id="ratioBarFill" style="width:0%"></div>
+        <div class="verdict-banner" id="verdictBanner">
+          <svg id="verdictIcon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"></svg>
+          <div class="verdict-body">
+            <div class="v-title" id="verdictTitle"></div>
+            <div class="v-detail" id="verdictDetail"></div>
+          </div>
         </div>
-        <div class="ratio-markers"><span>0</span><span style="margin-left:48%">0.5</span><span>1.0</span></div>
 
-        <div class="weft-bar-section" id="weftBarSection" style="display:none;">
-          <div class="bar-row-label">Weft d/p</div>
+        <div class="ratio-card" id="ratioCard" style="display:none;">
+          <div class="rc-title" id="ratioCardTitle">Weave Feasibility — d/p Ratio</div>
+          <div class="bar-row-label" id="warpBarLabel">Warp d/p</div>
           <div class="ratio-bar-wrap">
-            <div class="ratio-bar-fill" id="ratioBarFillWeft" style="width:0%"></div>
+            <div class="ratio-bar-fill" id="ratioBarFill" style="width:0%"></div>
           </div>
           <div class="ratio-markers"><span>0</span><span style="margin-left:48%">0.5</span><span>1.0</span></div>
+          <div class="weft-bar-section" id="weftBarSection" style="display:none;">
+            <div class="bar-row-label">Weft d/p</div>
+            <div class="ratio-bar-wrap">
+              <div class="ratio-bar-fill" id="ratioBarFillWeft" style="width:0%"></div>
+            </div>
+            <div class="ratio-markers"><span>0</span><span style="margin-left:48%">0.5</span><span>1.0</span></div>
+          </div>
+          <div class="ratio-values">
+            <div class="ratio-val">
+              <div class="rv-n" id="ratioDp">—</div>
+              <div class="rv-l">Warp d/p</div>
+            </div>
+            <div class="ratio-val" id="weftRatioVal" style="display:none;">
+              <div class="rv-n" id="ratioDpWeft">—</div>
+              <div class="rv-l">Weft d/p</div>
+            </div>
+            <div class="ratio-val">
+              <div class="rv-n" id="ratioPitchWarp">—</div>
+              <div class="rv-l">Warp pitch (mm)</div>
+            </div>
+            <div class="ratio-val" id="weftPitchVal" style="display:none;">
+              <div class="rv-n" id="ratioPitchWeft">—</div>
+              <div class="rv-l">Weft pitch (mm)</div>
+            </div>
+            <div class="ratio-val" id="simpleRatioExtras">
+              <div class="rv-n" id="ratioDia">—</div>
+              <div class="rv-l">Wire dia D (mm)</div>
+            </div>
+          </div>
         </div>
 
-        <div class="ratio-values">
-          <div class="ratio-val">
-            <div class="rv-n" id="ratioDp">—</div>
-            <div class="rv-l">Warp d/p</div>
+        <div class="result-cards">
+          <div class="stat-card">
+            <div>
+              <div class="label">Opening</div>
+              <div class="value" id="opening">—</div>
+              <div class="unit">Micron (μm)</div>
+            </div>
+            <div class="stat-icon icon-blue">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+            </div>
           </div>
-          <div class="ratio-val" id="weftRatioVal" style="display:none;">
-            <div class="rv-n" id="ratioDpWeft">—</div>
-            <div class="rv-l">Weft d/p</div>
+          <div class="stat-card">
+            <div>
+              <div class="label">Thickness</div>
+              <div class="value" id="thickness">—</div>
+              <div class="unit">mm</div>
+            </div>
+            <div class="stat-icon icon-green">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="10" rx="2"/></svg>
+            </div>
           </div>
-          <div class="ratio-val">
-            <div class="rv-n" id="ratioPitchWarp">—</div>
-            <div class="rv-l">Warp pitch (mm)</div>
+          <div class="stat-card">
+            <div>
+              <div class="label" id="dynLabel">Open Area</div>
+              <div class="value" id="dynValue">—</div>
+              <div class="unit" id="dynUnit">%</div>
+            </div>
+            <div class="stat-icon icon-purple">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg>
+            </div>
           </div>
-          <div class="ratio-val" id="weftPitchVal" style="display:none;">
-            <div class="rv-n" id="ratioPitchWeft">—</div>
-            <div class="rv-l">Weft pitch (mm)</div>
+          <div class="stat-card">
+            <div>
+              <div class="label">Weight</div>
+              <div class="value" id="weight">—</div>
+              <div class="unit">Kg/m²</div>
+            </div>
+            <div class="stat-icon icon-orange">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 2h12l2 6H4L6 2zM4 8v12a2 2 0 002 2h12a2 2 0 002-2V8"/></svg>
+            </div>
           </div>
-          <div class="ratio-val" id="simpleRatioExtras">
-            <div class="rv-n" id="ratioDia">—</div>
-            <div class="rv-l">Wire dia D (mm)</div>
+        </div>
+
+        <div class="summary-card">
+          <div class="s-header">Calculation Summary</div>
+          <div class="summary-grid" id="summaryGrid"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════ -->
+  <!-- ── PANEL B: REVERSE CALCULATOR ── -->
+  <!-- ══════════════════════════════════════ -->
+  <div class="panel hidden" id="panelReverse">
+    <div class="reverse-layout">
+
+      <!-- REVERSE INPUT CARD -->
+      <div class="card">
+        <div class="card-header">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16M4 12h10M4 20h7"/><path d="M18 8l4 4-4 4"/>
+          </svg>
+          <h2>Reverse Input — Known Opening</h2>
+        </div>
+        <div class="card-body">
+
+          <div class="input-group">
+            <label for="rOpening">Target Opening Size (µm)</label>
+            <input type="number" id="rOpening" placeholder="e.g. 300" />
           </div>
+
+          <div class="input-group">
+            <label for="rWeaveType">Weave Type</label>
+            <div class="select-wrap">
+              <select id="rWeaveType">
+                <option value="plain">Plain Weave</option>
+                <option value="twill">Twill Weave</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label style="font-size:0.8rem;font-weight:600;color:#374151;margin-bottom:8px;display:block;">
+              What do you want to find?
+            </label>
+            <div class="unknown-toggle">
+              <button class="unknown-opt selected" id="optMesh" onclick="selectUnknown('mesh')">
+                🔢 Find Mesh Count
+              </button>
+              <button class="unknown-opt" id="optDia" onclick="selectUnknown('diameter')">
+                📏 Find Wire Diameter
+              </button>
+            </div>
+          </div>
+
+          <!-- Input: wire diameter (shown when solving for mesh) -->
+          <div id="rInputDia" class="input-group">
+            <label for="rWarpDia" id="rLabelKnownDia">Wire Diameter D (mm) — known</label>
+            <input type="number" step="0.001" id="rWarpDia" placeholder="e.g. 0.200" />
+          </div>
+
+          <!-- Input: mesh count (shown when solving for diameter) -->
+          <div id="rInputMesh" class="input-group" style="display:none;">
+            <label for="rWarpMesh" id="rLabelKnownMesh">Mesh Count (wires/inch) — known</label>
+            <input type="number" id="rWarpMesh" placeholder="e.g. 50" />
+          </div>
+
+          <!-- Hidden rows (referenced in JS for toggle logic) -->
+          <div id="rInputMeshRow" style="display:none;"></div>
+          <div id="rInputDiaRow" style="display:none;"></div>
+
+          <div class="info-pill" id="rInfoPill">
+            Enter opening size (µm) + wire diameter → calculates the required mesh count.
+          </div>
+
+          <div class="btn-row" style="margin-top:16px;">
+            <button class="btn btn-primary" onclick="calculateReverse()">Solve</button>
+            <button class="btn btn-outline" onclick="resetReverse()">Reset</button>
+          </div>
+
+          <!-- Quick examples -->
+          <div class="samples-section">
+            <div class="samples-label">Quick Examples</div>
+            <button class="sample-btn" onclick="document.getElementById('rOpening').value=300;document.getElementById('rWarpDia').value=0.200;selectUnknown('mesh');calculateReverse()">
+              <div>
+                <div class="s-name">Find mesh for 300 µm opening</div>
+                <div class="s-params">D = 0.200 mm → mesh = ?</div>
+              </div>
+            </button>
+            <button class="sample-btn" onclick="document.getElementById('rOpening').value=150;document.getElementById('rWarpMesh').value=50;selectUnknown('diameter');calculateReverse()">
+              <div>
+                <div class="s-name">Find diameter for 150 µm opening</div>
+                <div class="s-params">Mesh = 50 → D = ?</div>
+              </div>
+            </button>
+            <button class="sample-btn" onclick="document.getElementById('rOpening').value=74;document.getElementById('rWarpDia').value=0.053;selectUnknown('mesh');calculateReverse()">
+              <div>
+                <div class="s-name">Find mesh for 74 µm (200 mesh equiv.)</div>
+                <div class="s-params">D = 0.053 mm → mesh = ?</div>
+              </div>
+            </button>
+            <button class="sample-btn" onclick="document.getElementById('rOpening').value=508;document.getElementById('rWarpMesh').value=30;selectUnknown('diameter');calculateReverse()">
+              <div>
+                <div class="s-name">Find diameter for 508 µm opening</div>
+                <div class="s-params">Mesh = 30 → D = ?</div>
+              </div>
+            </button>
+          </div>
+
         </div>
       </div>
 
-      <!-- Stat cards -->
-      <div class="result-cards">
-        <div class="stat-card">
-          <div>
-            <div class="label">Opening</div>
-            <div class="value" id="opening">—</div>
-            <div class="unit">Micron (μm)</div>
-          </div>
-          <div class="stat-icon icon-blue">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
-          </div>
+      <!-- REVERSE RESULTS PANEL -->
+      <div class="reverse-solve-results" id="reverseResults">
+        <!-- populated by JS -->
+        <div style="padding:32px 24px; text-align:center; color:var(--text-faint); font-size:0.875rem;">
+          <div style="font-size:2rem; margin-bottom:10px;">🔁</div>
+          Enter your known values on the left and click <strong>Solve</strong> to find the missing parameter.<br>
+          <span style="font-size:0.78rem; margin-top:6px; display:block;">Results also show nearest standard mesh counts or wire diameters.</span>
         </div>
-        <div class="stat-card">
-          <div>
-            <div class="label">Thickness</div>
-            <div class="value" id="thickness">—</div>
-            <div class="unit">mm</div>
-          </div>
-          <div class="stat-icon icon-green">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="10" rx="2"/></svg>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div>
-            <div class="label" id="dynLabel">Open Area</div>
-            <div class="value" id="dynValue">—</div>
-            <div class="unit" id="dynUnit">%</div>
-          </div>
-          <div class="stat-icon icon-purple">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div>
-            <div class="label">Weight</div>
-            <div class="value" id="weight">—</div>
-            <div class="unit">Kg/m²</div>
-          </div>
-          <div class="stat-icon icon-orange">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 2h12l2 6H4L6 2zM4 8v12a2 2 0 002 2h12a2 2 0 002-2V8"/></svg>
-          </div>
-        </div>
-      </div>
-
-      <!-- Summary -->
-      <div class="summary-card">
-        <div class="s-header">Calculation Summary</div>
-        <div class="summary-grid" id="summaryGrid"></div>
       </div>
 
     </div>
   </div>
+
 </div>
 
-<script>
-  // ── SAMPLE DATA ──
-  const SAMPLES = {
-    plain_ok:     { weave:'plain',       wm:50,  wf:50,  D:0.200, d:0.200 },
-    fine_plain:   { weave:'plain',       wm:200, wf:200, D:0.053, d:0.053 },
-    twill_needed: { weave:'twill',       wm:50,  wf:50,  D:0.300, d:0.300 },
-    coarse_twill: { weave:'twill',       wm:30,  wf:30,  D:0.500, d:0.500 },
-    plain_dutch:  { weave:'plain_dutch', wm:20,  wf:120, D:0.400, d:0.160 },
-    plain_dutch2: { weave:'plain_dutch', wm:12,  wf:64,  D:0.560, d:0.200 },
-    twill_dutch:  { weave:'twill_dutch', wm:24,  wf:110, D:0.630, d:0.200 },
-    twill_dutch2: { weave:'twill_dutch', wm:16,  wf:80,  D:0.800, d:0.250 }
-  };
-
-  function loadSample(key) {
-    const s = SAMPLES[key];
-    document.getElementById('weaveType').value = s.weave;
-    document.getElementById('warpMesh').value  = s.wm;
-    document.getElementById('weftMesh').value  = s.wf;
-    document.getElementById('warpDia').value   = s.D;
-    document.getElementById('weftDia').value   = s.d;
-    onWeaveChange();
-    calculateMesh();
-  }
-
-  // ── SYNC FIELDS ──
-  function syncFields(src) {
-    const weave = document.getElementById('weaveType').value;
-    if (weave !== 'plain' && weave !== 'twill') return;
-    if (src === 'warpMesh') document.getElementById('weftMesh').value = document.getElementById('warpMesh').value;
-    if (src === 'weftMesh') document.getElementById('warpMesh').value = document.getElementById('weftMesh').value;
-    if (src === 'warpDia')  document.getElementById('weftDia').value  = document.getElementById('warpDia').value;
-    if (src === 'weftDia')  document.getElementById('warpDia').value  = document.getElementById('weftDia').value;
-  }
-
-  function onWeaveChange() {
-    const weave = document.getElementById('weaveType').value;
-    const isSquare = (weave === 'plain' || weave === 'twill');
-    const isDutch  = (weave === 'plain_dutch' || weave === 'twill_dutch');
-
-    // lock/unlock weft fields
-    document.getElementById('weftMesh').disabled = isSquare;
-    document.getElementById('weftDia').disabled  = isSquare;
-
-    // hints
-    document.getElementById('weftMeshHint').textContent = isSquare
-      ? 'Auto-synced with Warp Mesh for square weaves'
-      : isDutch ? 'Set weft (fine) mesh independently for Dutch weaves' : '';
-    document.getElementById('weftDiaHint').textContent = isSquare
-      ? 'Auto-synced with Warp Diameter for square weaves'
-      : isDutch ? 'Set weft wire diameter independently for Dutch weaves' : '';
-
-    // labels
-    document.getElementById('labelWarpMesh').textContent = isDutch ? 'Warp Mesh — coarse (wires/inch)' : 'Warp Mesh (wires/inch)';
-    document.getElementById('labelWeftMesh').textContent = isDutch ? 'Weft Mesh — fine (wires/inch)'   : 'Weft Mesh (wires/inch)';
-    document.getElementById('labelWarpDia').textContent  = isDutch ? 'Warp Wire Diameter D — coarse (mm)' : 'Wire Diameter D (mm)';
-    document.getElementById('labelWeftDia').textContent  = isDutch ? 'Weft Wire Diameter d — fine (mm)'   : 'Wire Diameter d (mm)';
-
-    // weave info pill
-    document.getElementById('weaveInfoPlain').classList.toggle('show',      weave === 'plain');
-    document.getElementById('weaveInfoTwill').classList.toggle('show',      weave === 'twill');
-    document.getElementById('weaveInfoPlainDutch').classList.toggle('show', weave === 'plain_dutch');
-    document.getElementById('weaveInfoTwillDutch').classList.toggle('show', weave === 'twill_dutch');
-
-    if (isSquare) {
-      document.getElementById('weftMesh').value = document.getElementById('warpMesh').value;
-      document.getElementById('weftDia').value  = document.getElementById('warpDia').value;
-    }
-  }
-  onWeaveChange();
-
-  // ── ANIMATE NUMBER ──
-  function animateValue(id, target, decimals) {
-    const el = document.getElementById(id);
-    const duration = 900;
-    const start = performance.now();
-    const to = parseFloat(target);
-    el.classList.remove('animating');
-    void el.offsetWidth;
-    el.classList.add('animating');
-    function step(now) {
-      const elapsed = now - start;
-      const progress = Math.min(elapsed / duration, 1);
-      const ease = 1 - Math.pow(1 - progress, 3);
-      const cur = to * ease;
-      el.textContent = decimals ? cur.toFixed(decimals) : Math.round(cur);
-      if (progress < 1) requestAnimationFrame(step);
-      else el.textContent = decimals ? to.toFixed(decimals) : Math.round(to);
-    }
-    requestAnimationFrame(step);
-  }
-
-  // ── VERDICT BANNER ──
-  const VERDICT_ICONS = {
-    plain:       '<circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/>',
-    twill:       '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="13"/><circle cx="12" cy="17" r=".8" fill="currentColor"/>',
-    plain_dutch: '<circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/>',
-    twill_dutch: '<circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/>'
-  };
-
-  function showVerdict(type, title, detail) {
-    const banner = document.getElementById('verdictBanner');
-    banner.className = 'verdict-banner verdict-' + type;
-    document.getElementById('verdictIcon').innerHTML = VERDICT_ICONS[type] || VERDICT_ICONS.plain;
-    document.getElementById('verdictTitle').textContent  = title;
-    document.getElementById('verdictDetail').textContent = detail;
-    banner.style.display = 'flex';
-  }
-
-  // ── RATIO BAR ──
-  function barColor(r) { return r <= 0.5 ? '#22c55e' : r <= 0.67 ? '#f59e0b' : '#ef4444'; }
-
-  function showRatioBar({ warpR, warpPitch, warpDia, weftR, weftPitch, isDutch }) {
-    document.getElementById('ratioCard').style.display = 'block';
-    document.getElementById('ratioCardTitle').textContent = isDutch
-      ? 'Weave Feasibility — Warp & Weft d/p Ratios'
-      : 'Weave Feasibility — d/p Ratio';
-    document.getElementById('warpBarLabel').textContent = isDutch ? 'Warp d/p (decisive factor)' : 'Warp d/p';
-
-    // warp bar
-    const fill = document.getElementById('ratioBarFill');
-    fill.style.width = '0%';
-    setTimeout(() => { fill.style.width = Math.min(warpR*100, 100)+'%'; fill.style.background = barColor(warpR); }, 50);
-
-    // weft bar
-    document.getElementById('weftBarSection').style.display = isDutch ? 'block' : 'none';
-    document.getElementById('weftRatioVal').style.display   = isDutch ? 'block' : 'none';
-    document.getElementById('weftPitchVal').style.display   = isDutch ? 'block' : 'none';
-    document.getElementById('simpleRatioExtras').style.display = isDutch ? 'none' : 'block';
-
-    if (isDutch) {
-      const fillW = document.getElementById('ratioBarFillWeft');
-      fillW.style.width = '0%';
-      setTimeout(() => { fillW.style.width = Math.min(weftR*100, 100)+'%'; fillW.style.background = barColor(weftR); }, 80);
-      document.getElementById('ratioDpWeft').textContent    = weftR.toFixed(3);
-      document.getElementById('ratioPitchWeft').textContent = weftPitch.toFixed(4);
-    }
-
-    document.getElementById('ratioDp').textContent        = warpR.toFixed(3);
-    document.getElementById('ratioPitchWarp').textContent = warpPitch.toFixed(4);
-    document.getElementById('ratioDia').textContent       = warpDia.toFixed(3);
-  }
-
-  // ── MAIN CALCULATE ──
-  function calculateMesh() {
-    const weave = document.getElementById('weaveType').value;
-    const wm = parseFloat(document.getElementById('warpMesh').value) || 0;
-    const wf = parseFloat(document.getElementById('weftMesh').value) || 0;
-    const D  = parseFloat(document.getElementById('warpDia').value)  || 0;
-    const d  = parseFloat(document.getElementById('weftDia').value)  || 0;
-
-    document.getElementById('verdictBanner').style.display = 'none';
-    document.getElementById('ratioCard').style.display     = 'none';
-
-    const warpPitch = 25.4 / wm;   // mm
-    const weftPitch = 25.4 / wf;   // mm
-    const warpRatio = D / warpPitch;
-    const weftRatio = d / weftPitch;
-
-    let opening, thickness, weight, dynLabel, dynValue, dynUnit;
-
-    if (weave === 'plain' || weave === 'twill') {
-      // ── SQUARE WEAVE (PLAIN or TWILL) ──
-      opening   = (warpPitch - D) * 1000;   // µm
-      thickness = D * 2;
-      const openArea = Math.pow(1 - (wm * D) / 25.4, 2) * 100;
-      weight    = D * D * 0.493 * wm;
-      dynLabel  = 'Open Area';
-      dynValue  = openArea;
-      dynUnit   = '% open area';
-
-      showRatioBar({ warpR: warpRatio, warpPitch, warpDia: D, isDutch: false });
-
-      if (weave === 'plain') {
-        // User chose Plain — validate feasibility
-        if (warpRatio <= 0.5) {
-          showVerdict('plain',
-            `✅ Plain Weave — Feasible (d/p = ${warpRatio.toFixed(3)})`,
-            `d/p ≤ 0.5  →  Wire is thin enough to crimp over every adjacent wire. Plain over-1 under-1 is geometrically possible.`
-          );
-        } else if (warpRatio <= 0.67) {
-          showVerdict('twill',
-            `⚠️ Plain Weave NOT feasible — Switch to Twill (d/p = ${warpRatio.toFixed(3)})`,
-            `d/p > 0.5  →  Wire is too thick to crimp in plain weave. Twill (over-2 under-2) gives a longer crimp path and can accommodate this ratio.`
-          );
-        } else {
-          showVerdict('twill',
-            `❌ Plain Weave NOT feasible — Heavy Twill or Dutch required (d/p = ${warpRatio.toFixed(3)})`,
-            `d/p > 0.67  →  Very dense packing. Plain weave is geometrically impossible. Use Twill Dutch weave for this specification.`
-          );
-        }
-      } else {
-        // User chose Twill
-        if (warpRatio <= 0.5) {
-          showVerdict('plain',
-            `ℹ️ Twill selected — Plain Weave is also feasible (d/p = ${warpRatio.toFixed(3)})`,
-            `d/p ≤ 0.5  →  This spec can be made in plain weave too. Twill chosen will also work fine.`
-          );
-        } else if (warpRatio <= 0.67) {
-          showVerdict('twill',
-            `✅ Twill Weave — Correct choice (d/p = ${warpRatio.toFixed(3)})`,
-            `d/p > 0.5  →  Plain weave not feasible. Twill (over-2 under-2) is the right weave for this wire-to-pitch ratio.`
-          );
-        } else {
-          showVerdict('twill',
-            `⚠️ Twill Weave — Marginal; Dutch Twill advised (d/p = ${warpRatio.toFixed(3)})`,
-            `d/p > 0.67  →  Very tight packing. Standard twill is at its limit. Consider switching to Twill Dutch weave for best results.`
-          );
-        }
-      }
-
-    } else {
-      // ── DUTCH WEAVES (plain_dutch or twill_dutch) ──
-      // Opening formula for Dutch weave
-      const L = warpPitch;
-      opening   = D * ((L - D - d) / (L + D + d)) * 1000;   // µm (approx)
-      thickness = D + d + d;                                   // D + 2d
-      weight    = (D*D * 0.493 * wm) / 2 + (d*d * 0.493 * wf) / 2;
-      const constant = wf * d;
-      dynLabel  = 'Dutch Constant';
-      dynValue  = constant;
-      dynUnit   = 'nf × d';
-
-      showRatioBar({ warpR: warpRatio, warpPitch, warpDia: D, weftR: weftRatio, weftPitch, isDutch: true });
-
-      // Plain Dutch vs Twill Dutch: decisive factor = warp d/p ratio
-      // Weft d/p is always > 0.5 by definition (that's what makes it Dutch)
-      if (weave === 'plain_dutch') {
-        if (warpRatio <= 0.5) {
-          showVerdict('plain_dutch',
-            `✅ Plain Dutch Weave — Feasible (warp d/p = ${warpRatio.toFixed(3)})`,
-            `Warp d/p ≤ 0.5  →  Warp wires can be crimped in plain (over-1 under-1) pattern. `
-            + `Weft is packed tight (d/p = ${weftRatio.toFixed(3)} > 0.5) — that's the Dutch characteristic. Spec is geometrically valid.`
-          );
-        } else {
-          showVerdict('twill_dutch',
-            `⚠️ Plain Dutch NOT feasible — Switch to Twill Dutch (warp d/p = ${warpRatio.toFixed(3)})`,
-            `Warp d/p > 0.5  →  Warp wires are too thick for plain crimping. `
-            + `Twill Dutch (over-2 under-2 on warp) is required to accommodate this warp wire diameter at this mesh count.`
-          );
-        }
-      } else {
-        // twill_dutch
-        if (warpRatio > 0.5) {
-          showVerdict('twill_dutch',
-            `✅ Twill Dutch Weave — Feasible (warp d/p = ${warpRatio.toFixed(3)})`,
-            `Warp d/p > 0.5  →  Warp wires need twill crimping (over-2 under-2). `
-            + `Weft is densely packed (d/p = ${weftRatio.toFixed(3)}). Twill Dutch is the correct weave for this specification.`
-          );
-        } else {
-          showVerdict('plain_dutch',
-            `ℹ️ Twill Dutch selected — Plain Dutch is also feasible (warp d/p = ${warpRatio.toFixed(3)})`,
-            `Warp d/p ≤ 0.5  →  Plain Dutch weave can also accommodate this specification. `
-            + `Twill Dutch will work but Plain Dutch may offer simpler manufacture.`
-          );
-        }
-      }
-    }
-
-    // update stat cards
-    document.getElementById('dynLabel').textContent = dynLabel;
-    document.getElementById('dynUnit').textContent  = dynUnit;
-
-    animateValue('opening',   Math.max(0, opening),  false);
-    animateValue('thickness', thickness,              3);
-    animateValue('dynValue',  dynValue,               (weave === 'plain_dutch' || weave === 'twill_dutch') ? 3 : 1);
-    animateValue('weight',    weight,                 3);
-
-    // summary grid
-    const isDutch = (weave === 'plain_dutch' || weave === 'twill_dutch');
-    const weaveLabels = { plain:'Plain', twill:'Twill', plain_dutch:'Plain Dutch', twill_dutch:'Twill Dutch' };
-    let html = `
-      <div class="summary-item"><p>Weave</p><p>${weaveLabels[weave]}</p></div>
-      <div class="summary-item"><p>Warp Mesh</p><p>${wm || '—'} /in</p></div>
-      <div class="summary-item"><p>Warp Dia D</p><p>${D} mm</p></div>
-      <div class="summary-item"><p>Warp Pitch</p><p>${warpPitch.toFixed(4)} mm</p></div>`;
-    if (isDutch) {
-      html += `
-      <div class="summary-item"><p>Weft Mesh</p><p>${wf || '—'} /in</p></div>
-      <div class="summary-item"><p>Weft Dia d</p><p>${d} mm</p></div>
-      <div class="summary-item"><p>Weft Pitch</p><p>${weftPitch.toFixed(4)} mm</p></div>
-      <div class="summary-item"><p>Warp d/p</p><p>${warpRatio.toFixed(3)} ${warpRatio <= 0.5 ? '✅' : '⚠️'}</p></div>`;
-    } else {
-      html += `
-      <div class="summary-item"><p>d/p Ratio</p><p>${warpRatio.toFixed(3)}</p></div>
-      <div class="summary-item"><p>Plain Limit</p><p>d/p ≤ 0.50</p></div>
-      <div class="summary-item"><p>Twill Limit</p><p>d/p ≤ 0.67</p></div>
-      <div class="summary-item"><p>Feasibility</p><p>${warpRatio <= 0.5 ? '✅ Plain OK' : warpRatio <= 0.67 ? '⚠️ Twill req.' : '❌ Dutch req.'}</p></div>`;
-    }
-    document.getElementById('summaryGrid').innerHTML = html;
-  }
-
-  // ── RESET ──
-  function resetForm() {
-    ['warpMesh','weftMesh','warpDia','weftDia'].forEach(id => document.getElementById(id).value = '');
-    ['opening','thickness','dynValue','weight'].forEach(id => {
-      const el = document.getElementById(id);
-      el.classList.remove('animating');
-      el.textContent = '—';
-    });
-    document.getElementById('summaryGrid').innerHTML = '';
-    document.getElementById('verdictBanner').style.display = 'none';
-    document.getElementById('ratioCard').style.display     = 'none';
-  }
-</script>
+<script src="script.js"></script>
 </body>
 </html>
