@@ -286,21 +286,26 @@
         </div>
         <div class="card-body">
 
+          <!-- Opening -->
           <div class="input-group">
             <label for="rOpening">Target Opening Size (µm)</label>
             <input type="number" id="rOpening" placeholder="e.g. 300" />
           </div>
 
+          <!-- Weave type -->
           <div class="input-group">
             <label for="rWeaveType">Weave Type</label>
             <div class="select-wrap">
-              <select id="rWeaveType">
+              <select id="rWeaveType" onchange="onReverseWeaveChange()">
                 <option value="plain">Plain Weave</option>
                 <option value="twill">Twill Weave</option>
+                <option value="plain_dutch">Plain Dutch Weave</option>
+                <option value="twill_dutch">Twill Dutch Weave</option>
               </select>
             </div>
           </div>
 
+          <!-- What to find -->
           <div class="input-group">
             <label style="font-size:0.8rem;font-weight:600;color:#374151;margin-bottom:8px;display:block;">
               What do you want to find?
@@ -315,24 +320,60 @@
             </div>
           </div>
 
-          <!-- Input: wire diameter (shown when solving for mesh) -->
-          <div id="rInputDia" class="input-group">
-            <label for="rWarpDia" id="rLabelKnownDia">Wire Diameter D (mm) — known</label>
-            <input type="number" step="0.001" id="rWarpDia" placeholder="e.g. 0.200" />
+          <!-- ── SQUARE WEAVE INPUTS ── -->
+          <div id="rSquareInputs">
+            <!-- Solve for mesh: need diameter -->
+            <div id="rInputDia" class="input-group">
+              <label for="rWarpDia" id="rLabelKnownDia">Wire Diameter D (mm) — known</label>
+              <input type="number" step="0.001" id="rWarpDia" placeholder="e.g. 0.200" />
+            </div>
+            <!-- Solve for diameter: need mesh -->
+            <div id="rInputMesh" class="input-group" style="display:none;">
+              <label for="rWarpMesh" id="rLabelKnownMesh">Mesh Count (wires/inch) — known</label>
+              <input type="number" id="rWarpMesh" placeholder="e.g. 50" />
+            </div>
           </div>
 
-          <!-- Input: mesh count (shown when solving for diameter) -->
-          <div id="rInputMesh" class="input-group" style="display:none;">
-            <label for="rWarpMesh" id="rLabelKnownMesh">Mesh Count (wires/inch) — known</label>
-            <input type="number" id="rWarpMesh" placeholder="e.g. 50" />
+          <!-- ── DUTCH WEAVE INPUTS ── -->
+          <div id="rDutchInputs" style="display:none;">
+            <!-- Dutch: solve for warp mesh → need D (warp dia) + d (weft dia) + weft mesh -->
+            <div id="rDutchSolveMesh">
+              <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+                color:var(--text-faint);margin-bottom:8px;">Known values (provide all three)</div>
+              <div class="input-group">
+                <label for="rDutchD">Warp Wire Diameter D — coarse (mm)</label>
+                <input type="number" step="0.001" id="rDutchD" placeholder="e.g. 0.400" />
+              </div>
+              <div class="input-group">
+                <label for="rDutchd">Weft Wire Diameter d — fine (mm)</label>
+                <input type="number" step="0.001" id="rDutchd" placeholder="e.g. 0.160" />
+              </div>
+              <div class="input-group">
+                <label for="rDutchWeftMesh">Weft Mesh — fine (wires/inch)</label>
+                <input type="number" id="rDutchWeftMesh" placeholder="e.g. 120" />
+              </div>
+            </div>
+            <!-- Dutch: solve for warp dia → need warp mesh + weft mesh + weft dia -->
+            <div id="rDutchSolveDia" style="display:none;">
+              <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+                color:var(--text-faint);margin-bottom:8px;">Known values (provide all three)</div>
+              <div class="input-group">
+                <label for="rDutchWarpMesh">Warp Mesh — coarse (wires/inch)</label>
+                <input type="number" id="rDutchWarpMesh" placeholder="e.g. 20" />
+              </div>
+              <div class="input-group">
+                <label for="rDutchdKnown">Weft Wire Diameter d — fine (mm)</label>
+                <input type="number" step="0.001" id="rDutchdKnown" placeholder="e.g. 0.160" />
+              </div>
+              <div class="input-group">
+                <label for="rDutchWeftMesh2">Weft Mesh — fine (wires/inch)</label>
+                <input type="number" id="rDutchWeftMesh2" placeholder="e.g. 120" />
+              </div>
+            </div>
           </div>
-
-          <!-- Hidden rows (referenced in JS for toggle logic) -->
-          <div id="rInputMeshRow" style="display:none;"></div>
-          <div id="rInputDiaRow" style="display:none;"></div>
 
           <div class="info-pill" id="rInfoPill">
-            Enter opening size (µm) + wire diameter → calculates the required mesh count.
+            Enter opening (µm) + wire diameter → calculates the required mesh count.
           </div>
 
           <div class="btn-row" style="margin-top:16px;">
@@ -343,29 +384,46 @@
           <!-- Quick examples -->
           <div class="samples-section">
             <div class="samples-label">Quick Examples</div>
-            <button class="sample-btn" onclick="document.getElementById('rOpening').value=300;document.getElementById('rWarpDia').value=0.200;selectUnknown('mesh');calculateReverse()">
-              <div>
-                <div class="s-name">Find mesh for 300 µm opening</div>
-                <div class="s-params">D = 0.200 mm → mesh = ?</div>
-              </div>
+
+            <div class="sample-group-label">Plain / Twill</div>
+            <button class="sample-btn" onclick="rLoadSample({weave:'plain',unknown:'mesh',opening:300,D:0.200})">
+              <div><div class="s-name">Find mesh — 300 µm opening</div>
+              <div class="s-params">Plain | D=0.200 mm → mesh=?</div></div>
+              <span class="sample-badge badge-plain">PLAIN</span>
             </button>
-            <button class="sample-btn" onclick="document.getElementById('rOpening').value=150;document.getElementById('rWarpMesh').value=50;selectUnknown('diameter');calculateReverse()">
-              <div>
-                <div class="s-name">Find diameter for 150 µm opening</div>
-                <div class="s-params">Mesh = 50 → D = ?</div>
-              </div>
+            <button class="sample-btn" onclick="rLoadSample({weave:'plain',unknown:'diameter',opening:150,mesh:50})">
+              <div><div class="s-name">Find diameter — 150 µm opening</div>
+              <div class="s-params">Plain | Mesh=50 → D=?</div></div>
+              <span class="sample-badge badge-plain">PLAIN</span>
             </button>
-            <button class="sample-btn" onclick="document.getElementById('rOpening').value=74;document.getElementById('rWarpDia').value=0.053;selectUnknown('mesh');calculateReverse()">
-              <div>
-                <div class="s-name">Find mesh for 74 µm (200 mesh equiv.)</div>
-                <div class="s-params">D = 0.053 mm → mesh = ?</div>
-              </div>
+            <button class="sample-btn" onclick="rLoadSample({weave:'twill',unknown:'mesh',opening:200,D:0.300})">
+              <div><div class="s-name">Find mesh — 200 µm, twill</div>
+              <div class="s-params">Twill | D=0.300 mm → mesh=?</div></div>
+              <span class="sample-badge badge-twill">TWILL</span>
             </button>
-            <button class="sample-btn" onclick="document.getElementById('rOpening').value=508;document.getElementById('rWarpMesh').value=30;selectUnknown('diameter');calculateReverse()">
-              <div>
-                <div class="s-name">Find diameter for 508 µm opening</div>
-                <div class="s-params">Mesh = 30 → D = ?</div>
-              </div>
+
+            <div class="sample-group-label">Plain Dutch</div>
+            <button class="sample-btn" onclick="rLoadSample({weave:'plain_dutch',unknown:'mesh',opening:80,D:0.400,d:0.160,wf:120})">
+              <div><div class="s-name">Find warp mesh — 80 µm opening</div>
+              <div class="s-params">P-Dutch | D=0.400, d=0.160, wf=120 → wm=?</div></div>
+              <span class="sample-badge badge-plain-dutch">P-DUTCH</span>
+            </button>
+            <button class="sample-btn" onclick="rLoadSample({weave:'plain_dutch',unknown:'diameter',opening:80,wm:20,d:0.160,wf:120})">
+              <div><div class="s-name">Find warp dia — 80 µm opening</div>
+              <div class="s-params">P-Dutch | wm=20, d=0.160, wf=120 → D=?</div></div>
+              <span class="sample-badge badge-plain-dutch">P-DUTCH</span>
+            </button>
+
+            <div class="sample-group-label">Twill Dutch</div>
+            <button class="sample-btn" onclick="rLoadSample({weave:'twill_dutch',unknown:'mesh',opening:60,D:0.630,d:0.200,wf:110})">
+              <div><div class="s-name">Find warp mesh — 60 µm opening</div>
+              <div class="s-params">T-Dutch | D=0.630, d=0.200, wf=110 → wm=?</div></div>
+              <span class="sample-badge badge-twill-dutch">T-DUTCH</span>
+            </button>
+            <button class="sample-btn" onclick="rLoadSample({weave:'twill_dutch',unknown:'diameter',opening:60,wm:24,d:0.200,wf:110})">
+              <div><div class="s-name">Find warp dia — 60 µm opening</div>
+              <div class="s-params">T-Dutch | wm=24, d=0.200, wf=110 → D=?</div></div>
+              <span class="sample-badge badge-twill-dutch">T-DUTCH</span>
             </button>
           </div>
 
@@ -374,7 +432,6 @@
 
       <!-- REVERSE RESULTS PANEL -->
       <div class="reverse-solve-results" id="reverseResults">
-        <!-- populated by JS -->
         <div style="padding:32px 24px; text-align:center; color:var(--text-faint); font-size:0.875rem;">
           <div style="font-size:2rem; margin-bottom:10px;">🔁</div>
           Enter your known values on the left and click <strong>Solve</strong> to find the missing parameter.<br>

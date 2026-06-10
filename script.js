@@ -310,151 +310,6 @@ function resetForm() {
 
 let reverseUnknown = 'mesh'; // 'mesh' | 'diameter'
 
-function selectUnknown(val) {
-  reverseUnknown = val;
-  document.getElementById('optMesh').classList.toggle('selected', val === 'mesh');
-  document.getElementById('optDia').classList.toggle('selected', val === 'diameter');
-
-  // toggle input visibility
-  document.getElementById('rInputMesh').style.display    = val === 'diameter' ? 'block' : 'none';
-  document.getElementById('rInputDia').style.display     = val === 'mesh'     ? 'block' : 'none';
-  document.getElementById('rInputMeshRow').style.display = val === 'mesh'     ? 'none'  : 'block';
-  document.getElementById('rInputDiaRow').style.display  = val === 'diameter' ? 'none'  : 'block';
-
-  // update label for known input
-  if (val === 'mesh') {
-    document.getElementById('rLabelKnownDia').textContent = 'Wire Diameter D (mm) — known';
-    document.getElementById('rInfoPill').textContent      = 'Enter opening size (µm) + wire diameter → calculates the required mesh count.';
-  } else {
-    document.getElementById('rLabelKnownMesh').textContent = 'Mesh Count (wires/inch) — known';
-    document.getElementById('rInfoPill').textContent       = 'Enter opening size (µm) + mesh count → calculates the required wire diameter.';
-  }
-
-  // clear results
-  document.getElementById('reverseResults').innerHTML = '';
-}
-
-function calculateReverse() {
-  const openingMicron = parseFloat(document.getElementById('rOpening').value) || 0;
-  const weave = document.getElementById('rWeaveType').value;
-
-  // Validate opening
-  if (openingMicron <= 0) {
-    showReverseError('Please enter a valid opening size in microns.');
-    return;
-  }
-
-  const openingMm = openingMicron / 1000; // convert µm → mm
-
-  let resultsHTML = '';
-
-  if (reverseUnknown === 'mesh') {
-    // Known: opening + diameter → find mesh
-    const D = parseFloat(document.getElementById('rWarpDia').value) || 0;
-    if (D <= 0) { showReverseError('Please enter a valid wire diameter.'); return; }
-
-    // For plain/twill square weave:
-    // opening = pitch - D  →  pitch = opening + D
-    // mesh = 25.4 / pitch
-    const pitch = openingMm + D;
-    const mesh  = 25.4 / pitch;
-    const ratio = D / pitch;
-    const openArea = Math.pow(1 - (mesh * D) / 25.4, 2) * 100;
-    const thickness = D * 2;
-    const weight = D * D * 0.493 * mesh;
-
-    const feasibility = ratio <= 0.5
-      ? { label: '✅ Plain Weave OK', color: 'var(--green)', bg: 'var(--green-light)' }
-      : ratio <= 0.67
-        ? { label: '⚠️ Twill Weave needed', color: 'var(--amber)', bg: 'var(--amber-light)' }
-        : { label: '❌ Dutch Weave required', color: 'var(--red)', bg: 'var(--red-light)' };
-
-    resultsHTML = `
-      <div class="solve-result-card">
-        <div class="src-eyebrow">Calculated Result — Mesh Count</div>
-        <div class="solve-result-row">
-          <div>
-            <div class="solve-big" id="rResultMesh">${mesh.toFixed(2)}</div>
-            <div class="solve-unit">wires / inch</div>
-          </div>
-          <div class="solve-divider"></div>
-          <div class="solve-sub-grid">
-            <div class="solve-sub-item"><p>Pitch</p><p>${pitch.toFixed(4)} mm</p></div>
-            <div class="solve-sub-item"><p>d/p Ratio</p><p>${ratio.toFixed(3)}</p></div>
-            <div class="solve-sub-item"><p>Open Area</p><p>${openArea.toFixed(1)}%</p></div>
-            <div class="solve-sub-item"><p>Thickness</p><p>${thickness.toFixed(3)} mm</p></div>
-            <div class="solve-sub-item"><p>Weight</p><p>${weight.toFixed(3)} kg/m²</p></div>
-            <div class="solve-sub-item"><p>Opening</p><p>${openingMicron} µm</p></div>
-          </div>
-        </div>
-        <div style="margin-top:12px; padding:8px 12px; border-radius:7px; font-size:0.78rem; font-weight:600;
-             background:${feasibility.bg}; color:${feasibility.color}; border: 1px solid ${feasibility.color}33;">
-          ${feasibility.label} &nbsp;·&nbsp; d/p = ${ratio.toFixed(3)}
-        </div>
-      </div>
-      <div class="solve-result-card">
-        <div class="src-eyebrow">Nearest Standard Mesh Counts</div>
-        ${nearestMeshSuggestions(mesh, D, openingMicron)}
-      </div>`;
-
-  } else {
-    // Known: opening + mesh → find diameter
-    const mesh = parseFloat(document.getElementById('rWarpMesh').value) || 0;
-    if (mesh <= 0) { showReverseError('Please enter a valid mesh count.'); return; }
-
-    // pitch = 25.4 / mesh
-    // opening = pitch - D  →  D = pitch - opening
-    const pitch = 25.4 / mesh;
-    const D = pitch - openingMm;
-
-    if (D <= 0) {
-      showReverseError(`Opening (${openingMicron} µm = ${openingMm.toFixed(4)} mm) is larger than the pitch (${pitch.toFixed(4)} mm) at ${mesh} mesh. Decrease opening or increase mesh count.`);
-      return;
-    }
-
-    const ratio = D / pitch;
-    const openArea = Math.pow(1 - (mesh * D) / 25.4, 2) * 100;
-    const thickness = D * 2;
-    const weight = D * D * 0.493 * mesh;
-
-    const feasibility = ratio <= 0.5
-      ? { label: '✅ Plain Weave OK', color: 'var(--green)', bg: 'var(--green-light)' }
-      : ratio <= 0.67
-        ? { label: '⚠️ Twill Weave needed', color: 'var(--amber)', bg: 'var(--amber-light)' }
-        : { label: '❌ Dutch Weave required', color: 'var(--red)', bg: 'var(--red-light)' };
-
-    resultsHTML = `
-      <div class="solve-result-card">
-        <div class="src-eyebrow">Calculated Result — Wire Diameter</div>
-        <div class="solve-result-row">
-          <div>
-            <div class="solve-big" id="rResultDia">${(D*1000).toFixed(1)}</div>
-            <div class="solve-unit">µm &nbsp;=&nbsp; ${D.toFixed(4)} mm</div>
-          </div>
-          <div class="solve-divider"></div>
-          <div class="solve-sub-grid">
-            <div class="solve-sub-item"><p>Pitch</p><p>${pitch.toFixed(4)} mm</p></div>
-            <div class="solve-sub-item"><p>d/p Ratio</p><p>${ratio.toFixed(3)}</p></div>
-            <div class="solve-sub-item"><p>Open Area</p><p>${openArea.toFixed(1)}%</p></div>
-            <div class="solve-sub-item"><p>Thickness</p><p>${thickness.toFixed(3)} mm</p></div>
-            <div class="solve-sub-item"><p>Weight</p><p>${weight.toFixed(3)} kg/m²</p></div>
-            <div class="solve-sub-item"><p>Opening</p><p>${openingMicron} µm</p></div>
-          </div>
-        </div>
-        <div style="margin-top:12px; padding:8px 12px; border-radius:7px; font-size:0.78rem; font-weight:600;
-             background:${feasibility.bg}; color:${feasibility.color}; border: 1px solid ${feasibility.color}33;">
-          ${feasibility.label} &nbsp;·&nbsp; d/p = ${ratio.toFixed(3)}
-        </div>
-      </div>
-      <div class="solve-result-card">
-        <div class="src-eyebrow">Nearest Standard Wire Diameters</div>
-        ${nearestDiaSuggestions(D, mesh, openingMicron)}
-      </div>`;
-  }
-
-  document.getElementById('reverseResults').innerHTML = resultsHTML;
-}
-
 // Standard wire diameters (mm) from wire gauge standards
 const STD_DIAMETERS = [
   0.025, 0.032, 0.040, 0.050, 0.053, 0.063, 0.071, 0.080, 0.090, 0.100,
@@ -469,51 +324,446 @@ const STD_MESHES = [
   60, 65, 70, 80, 100, 110, 120, 150, 165, 200, 230, 270, 325, 400, 500
 ];
 
-function nearestMeshSuggestions(calcMesh, D, targetOpeningMicron) {
-  const candidates = STD_MESHES.filter(m => m > 0);
+function onReverseWeaveChange() {
+  const weave = document.getElementById('rWeaveType').value;
+  const isDutch = (weave === 'plain_dutch' || weave === 'twill_dutch');
+  document.getElementById('rSquareInputs').style.display = isDutch ? 'none' : 'block';
+  document.getElementById('rDutchInputs').style.display  = isDutch ? 'block' : 'none';
+  updateReverseInfoPill();
+  document.getElementById('reverseResults').innerHTML = '';
+  // re-apply unknown toggle for dutch sub-panels
+  applyUnknownToDutch();
+}
+
+function applyUnknownToDutch() {
+  const solveMesh = reverseUnknown === 'mesh';
+  document.getElementById('rDutchSolveMesh').style.display = solveMesh ? 'block' : 'none';
+  document.getElementById('rDutchSolveDia').style.display  = solveMesh ? 'none'  : 'block';
+}
+
+function selectUnknown(val) {
+  reverseUnknown = val;
+  document.getElementById('optMesh').classList.toggle('selected', val === 'mesh');
+  document.getElementById('optDia').classList.toggle('selected', val === 'diameter');
+
+  // square weave panels
+  document.getElementById('rInputMesh').style.display = val === 'diameter' ? 'block' : 'none';
+  document.getElementById('rInputDia').style.display  = val === 'mesh'     ? 'block' : 'none';
+
+  // dutch weave sub-panels
+  applyUnknownToDutch();
+
+  updateReverseInfoPill();
+  document.getElementById('reverseResults').innerHTML = '';
+}
+
+function updateReverseInfoPill() {
+  const weave = document.getElementById('rWeaveType').value;
+  const isDutch = (weave === 'plain_dutch' || weave === 'twill_dutch');
+  const pill = document.getElementById('rInfoPill');
+  if (!isDutch) {
+    pill.textContent = reverseUnknown === 'mesh'
+      ? 'Enter opening (µm) + wire diameter → calculates the required mesh count.'
+      : 'Enter opening (µm) + mesh count → calculates the required wire diameter.';
+  } else {
+    pill.textContent = reverseUnknown === 'mesh'
+      ? 'Dutch: enter opening (µm) + both wire diameters + weft mesh → finds warp mesh count.'
+      : 'Dutch: enter opening (µm) + warp mesh + weft wire diameter + weft mesh → finds warp wire diameter.';
+  }
+}
+
+// ── Dutch opening formula (forward):
+//   opening = D * (L - D - d) / (L + D + d)   where L = warp pitch = 25.4/wm
+//
+// Reverse for warp mesh (wm):
+//   Given: opening_mm, D, d, wf  →  find wm
+//   Let L = warp pitch = 25.4/wm
+//   opening_mm = D*(L - D - d)/(L + D + d)
+//   opening_mm*(L + D + d) = D*(L - D - d)
+//   opening_mm*L + opening_mm*(D+d) = D*L - D*(D+d)
+//   L*(opening_mm - D) = -D*(D+d) - opening_mm*(D+d)
+//   L*(opening_mm - D) = -(D+d)*(D + opening_mm)
+//   L = -(D+d)*(D + opening_mm) / (opening_mm - D)
+//   L = (D+d)*(D + opening_mm) / (D - opening_mm)
+//   wm = 25.4 / L
+//
+// Reverse for warp dia D:
+//   Given: opening_mm, wm, d, wf  →  find D
+//   L = 25.4/wm  (known)
+//   opening_mm*(L + D + d) = D*(L - D - d)
+//   opening_mm*L + opening_mm*D + opening_mm*d = D*L - D^2 - D*d
+//   D^2 + D*(opening_mm + L + d) - D*L + opening_mm*L + opening_mm*d = 0
+//   D^2 + D*(opening_mm + d - L + L) ... re-expand carefully:
+//   D^2 + opening_mm*D + D*d + D*L + opening_mm*L + opening_mm*d - D*L + D^2 ... wait
+//   Let me re-derive cleanly:
+//   opening*(L+D+d) = D*(L-D-d)
+//   opening*L + opening*D + opening*d = D*L - D^2 - D*d
+//   D^2 + D*(opening + d - L + opening + d) ... hmm, collect D terms:
+//   D^2 + D*(opening + d) + D*L - D*L + D*d + D^2 ... let me be very explicit:
+//   Move everything to one side:
+//   opening*L + opening*D + opening*d - D*L + D^2 + D*d = 0
+//   D^2 + D*(opening - L + d + opening ... no
+//
+//   More carefully:
+//   opening*(L + D + d) = D*(L - D - d)
+//   opening*L + opening*D + opening*d = D*L - D² - D*d
+//   D² + D*d + opening*D - D*L + D*d + opening*d + opening*L = 0  ... NO, let me just move all to left:
+//   opening*L + opening*D + opening*d - D*L + D² + D*d = 0
+//   D² + D*(opening + d - L + d ... wait: coefficients of D:
+//   from opening*D → +opening
+//   from -D*L     → -L
+//   from D*d      → +d
+//   So: D² + D*(opening - L + d) + opening*(L + d) = 0
+//   quadratic in D: a=1, b=(opening - L + d), c=opening*(L+d)
+//   D = [-b ± sqrt(b²-4c)] / 2
+
+function dutchReverseWarpMesh(openingMm, D, d) {
+  // L = (D + d) * (D + openingMm) / (D - openingMm)
+  if (D <= openingMm) return null; // no solution (opening must be < D for Dutch)
+  const L = (D + d) * (D + openingMm) / (D - openingMm);
+  if (L <= 0) return null;
+  return 25.4 / L;
+}
+
+function dutchReverseWarpDia(openingMm, wm, d) {
+  const L = 25.4 / wm;
+  // D² + D*(openingMm - L + d) + openingMm*(L + d) = 0
+  const a = 1;
+  const b = openingMm - L + d;
+  const c = openingMm * (L + d);
+  const disc = b*b - 4*a*c;
+  if (disc < 0) return null;
+  const D1 = (-b + Math.sqrt(disc)) / 2;
+  const D2 = (-b - Math.sqrt(disc)) / 2;
+  // pick positive root that makes physical sense (D > 0, D > openingMm for Dutch)
+  const candidates = [D1, D2].filter(v => v > 0 && v > openingMm);
+  if (!candidates.length) return null;
+  return Math.min(...candidates);
+}
+
+function dutchOpeningCheck(wm, D, d) {
+  // verify: opening = D*(L-D-d)/(L+D+d)
+  const L = 25.4 / wm;
+  return D * (L - D - d) / (L + D + d) * 1000; // µm
+}
+
+function dutchFeasibility(wm, D, weave) {
+  const warpPitch = 25.4 / wm;
+  const ratio = D / warpPitch;
+  if (weave === 'plain_dutch') {
+    return ratio <= 0.5
+      ? { label: '✅ Plain Dutch — Warp d/p OK', color: 'var(--green)', bg: 'var(--green-light)' }
+      : { label: '⚠️ Warp d/p > 0.5 — Switch to Twill Dutch', color: 'var(--amber)', bg: 'var(--amber-light)' };
+  } else {
+    return ratio > 0.5
+      ? { label: '✅ Twill Dutch — Warp d/p correct', color: 'var(--green)', bg: 'var(--green-light)' }
+      : { label: 'ℹ️ Warp d/p ≤ 0.5 — Plain Dutch also feasible', color: 'var(--blue)', bg: 'var(--blue-light)' };
+  }
+}
+
+function calculateReverse() {
+  const openingMicron = parseFloat(document.getElementById('rOpening').value) || 0;
+  const weave = document.getElementById('rWeaveType').value;
+  const isDutch = (weave === 'plain_dutch' || weave === 'twill_dutch');
+
+  if (openingMicron <= 0) { showReverseError('Please enter a valid opening size in microns.'); return; }
+  const openingMm = openingMicron / 1000;
+
+  let resultsHTML = '';
+
+  if (!isDutch) {
+    // ── SQUARE WEAVE (plain / twill) ──
+    if (reverseUnknown === 'mesh') {
+      const D = parseFloat(document.getElementById('rWarpDia').value) || 0;
+      if (D <= 0) { showReverseError('Please enter a valid wire diameter.'); return; }
+
+      const pitch = openingMm + D;
+      const mesh  = 25.4 / pitch;
+      const ratio = D / pitch;
+      const openArea = Math.pow(1 - (mesh * D) / 25.4, 2) * 100;
+      const thickness = D * 2;
+      const weight = D * D * 0.493 * mesh;
+
+      const feas = ratio <= 0.5
+        ? { label: '✅ Plain Weave OK', color: 'var(--green)', bg: 'var(--green-light)' }
+        : ratio <= 0.67
+          ? { label: '⚠️ Twill Weave needed', color: 'var(--amber)', bg: 'var(--amber-light)' }
+          : { label: '❌ Dutch Weave required', color: 'var(--red)', bg: 'var(--red-light)' };
+
+      resultsHTML = `
+        <div class="solve-result-card">
+          <div class="src-eyebrow">Result — Warp Mesh Count</div>
+          <div class="solve-result-row">
+            <div>
+              <div class="solve-big">${mesh.toFixed(2)}</div>
+              <div class="solve-unit">wires / inch</div>
+            </div>
+            <div class="solve-divider"></div>
+            <div class="solve-sub-grid">
+              <div class="solve-sub-item"><p>Pitch</p><p>${pitch.toFixed(4)} mm</p></div>
+              <div class="solve-sub-item"><p>d/p Ratio</p><p>${ratio.toFixed(3)}</p></div>
+              <div class="solve-sub-item"><p>Open Area</p><p>${openArea.toFixed(1)}%</p></div>
+              <div class="solve-sub-item"><p>Thickness</p><p>${thickness.toFixed(3)} mm</p></div>
+              <div class="solve-sub-item"><p>Weight</p><p>${weight.toFixed(3)} kg/m²</p></div>
+              <div class="solve-sub-item"><p>Opening</p><p>${openingMicron} µm ✓</p></div>
+            </div>
+          </div>
+          <div style="margin-top:12px;padding:8px 12px;border-radius:7px;font-size:0.78rem;font-weight:600;
+            background:${feas.bg};color:${feas.color};border:1px solid ${feas.color}33;">
+            ${feas.label} &nbsp;·&nbsp; d/p = ${ratio.toFixed(3)}
+          </div>
+        </div>
+        <div class="solve-result-card">
+          <div class="src-eyebrow">Nearest Standard Mesh Counts</div>
+          ${nearestMeshSuggestions(mesh, D, openingMicron, false)}
+        </div>`;
+
+    } else {
+      // solve for diameter
+      const mesh = parseFloat(document.getElementById('rWarpMesh').value) || 0;
+      if (mesh <= 0) { showReverseError('Please enter a valid mesh count.'); return; }
+
+      const pitch = 25.4 / mesh;
+      const D = pitch - openingMm;
+
+      if (D <= 0) {
+        showReverseError(`Opening (${openingMicron} µm) ≥ pitch (${(pitch*1000).toFixed(0)} µm) at ${mesh} mesh. Reduce opening or increase mesh.`);
+        return;
+      }
+
+      const ratio = D / pitch;
+      const openArea = Math.pow(1 - (mesh * D) / 25.4, 2) * 100;
+      const thickness = D * 2;
+      const weight = D * D * 0.493 * mesh;
+
+      const feas = ratio <= 0.5
+        ? { label: '✅ Plain Weave OK', color: 'var(--green)', bg: 'var(--green-light)' }
+        : ratio <= 0.67
+          ? { label: '⚠️ Twill Weave needed', color: 'var(--amber)', bg: 'var(--amber-light)' }
+          : { label: '❌ Dutch Weave required', color: 'var(--red)', bg: 'var(--red-light)' };
+
+      resultsHTML = `
+        <div class="solve-result-card">
+          <div class="src-eyebrow">Result — Wire Diameter</div>
+          <div class="solve-result-row">
+            <div>
+              <div class="solve-big">${(D*1000).toFixed(1)}</div>
+              <div class="solve-unit">µm &nbsp;=&nbsp; ${D.toFixed(4)} mm</div>
+            </div>
+            <div class="solve-divider"></div>
+            <div class="solve-sub-grid">
+              <div class="solve-sub-item"><p>Pitch</p><p>${pitch.toFixed(4)} mm</p></div>
+              <div class="solve-sub-item"><p>d/p Ratio</p><p>${ratio.toFixed(3)}</p></div>
+              <div class="solve-sub-item"><p>Open Area</p><p>${openArea.toFixed(1)}%</p></div>
+              <div class="solve-sub-item"><p>Thickness</p><p>${thickness.toFixed(3)} mm</p></div>
+              <div class="solve-sub-item"><p>Weight</p><p>${weight.toFixed(3)} kg/m²</p></div>
+              <div class="solve-sub-item"><p>Opening</p><p>${openingMicron} µm ✓</p></div>
+            </div>
+          </div>
+          <div style="margin-top:12px;padding:8px 12px;border-radius:7px;font-size:0.78rem;font-weight:600;
+            background:${feas.bg};color:${feas.color};border:1px solid ${feas.color}33;">
+            ${feas.label} &nbsp;·&nbsp; d/p = ${ratio.toFixed(3)}
+          </div>
+        </div>
+        <div class="solve-result-card">
+          <div class="src-eyebrow">Nearest Standard Wire Diameters</div>
+          ${nearestDiaSuggestions(D, mesh, openingMicron, false)}
+        </div>`;
+    }
+
+  } else {
+    // ── DUTCH WEAVE (plain_dutch / twill_dutch) ──
+    if (reverseUnknown === 'mesh') {
+      // Known: opening + D + d + wf → find wm
+      const D  = parseFloat(document.getElementById('rDutchD').value)       || 0;
+      const d  = parseFloat(document.getElementById('rDutchd').value)       || 0;
+      const wf = parseFloat(document.getElementById('rDutchWeftMesh').value) || 0;
+      if (D <= 0 || d <= 0 || wf <= 0) { showReverseError('Please fill in all three known values (D, d, weft mesh).'); return; }
+      if (D <= d)  { showReverseError('Warp diameter D must be larger than weft diameter d in Dutch weave.'); return; }
+      if (D <= openingMm) { showReverseError(`Wire diameter D (${D} mm) must be greater than opening (${openingMm.toFixed(4)} mm) for Dutch weave geometry.`); return; }
+
+      const wm = dutchReverseWarpMesh(openingMm, D, d);
+      if (!wm || wm <= 0) { showReverseError('No valid solution found. Check that opening < D and geometry is feasible.'); return; }
+
+      const warpPitch = 25.4 / wm;
+      const weftPitch = 25.4 / wf;
+      const warpRatio = D / warpPitch;
+      const weftRatio = d / weftPitch;
+      const thickness = D + 2*d;
+      const weight = (D*D*0.493*wm)/2 + (d*d*0.493*wf)/2;
+      const constant = wf * d;
+      const verifyOpening = dutchOpeningCheck(wm, D, d);
+      const feas = dutchFeasibility(wm, D, weave);
+
+      resultsHTML = `
+        <div class="solve-result-card">
+          <div class="src-eyebrow">Result — Warp Mesh Count (Dutch)</div>
+          <div class="solve-result-row">
+            <div>
+              <div class="solve-big">${wm.toFixed(2)}</div>
+              <div class="solve-unit">wires / inch (warp)</div>
+            </div>
+            <div class="solve-divider"></div>
+            <div class="solve-sub-grid">
+              <div class="solve-sub-item"><p>Warp Pitch</p><p>${warpPitch.toFixed(4)} mm</p></div>
+              <div class="solve-sub-item"><p>Warp d/p</p><p>${warpRatio.toFixed(3)} ${warpRatio<=0.5?'✅':'⚠️'}</p></div>
+              <div class="solve-sub-item"><p>Weft d/p</p><p>${weftRatio.toFixed(3)}</p></div>
+              <div class="solve-sub-item"><p>Thickness</p><p>${thickness.toFixed(3)} mm</p></div>
+              <div class="solve-sub-item"><p>Dutch Const.</p><p>${constant.toFixed(3)}</p></div>
+              <div class="solve-sub-item"><p>Opening ✓</p><p>${verifyOpening.toFixed(1)} µm</p></div>
+            </div>
+          </div>
+          <div style="margin-top:12px;padding:8px 12px;border-radius:7px;font-size:0.78rem;font-weight:600;
+            background:${feas.bg};color:${feas.color};border:1px solid ${feas.color}33;">
+            ${feas.label} &nbsp;·&nbsp; Warp d/p = ${warpRatio.toFixed(3)}
+          </div>
+        </div>
+        <div class="solve-result-card">
+          <div class="src-eyebrow">Nearest Standard Warp Mesh Counts</div>
+          ${nearestMeshSuggestions(wm, D, openingMicron, true, d, wf)}
+        </div>`;
+
+    } else {
+      // Known: opening + wm + d + wf → find D
+      const wm = parseFloat(document.getElementById('rDutchWarpMesh').value)  || 0;
+      const d  = parseFloat(document.getElementById('rDutchdKnown').value)    || 0;
+      const wf = parseFloat(document.getElementById('rDutchWeftMesh2').value) || 0;
+      if (wm <= 0 || d <= 0 || wf <= 0) { showReverseError('Please fill in all three known values (warp mesh, d, weft mesh).'); return; }
+
+      const D = dutchReverseWarpDia(openingMm, wm, d);
+      if (!D || D <= 0) { showReverseError('No valid solution found. The opening may be too large for this mesh/diameter combination.'); return; }
+      if (D <= d) { showReverseError(`Calculated warp diameter D (${D.toFixed(4)} mm) ≤ weft diameter d (${d} mm). Adjust inputs.`); return; }
+
+      const warpPitch = 25.4 / wm;
+      const weftPitch = 25.4 / wf;
+      const warpRatio = D / warpPitch;
+      const weftRatio = d / weftPitch;
+      const thickness = D + 2*d;
+      const weight = (D*D*0.493*wm)/2 + (d*d*0.493*wf)/2;
+      const constant = wf * d;
+      const verifyOpening = dutchOpeningCheck(wm, D, d);
+      const feas = dutchFeasibility(wm, D, weave);
+
+      resultsHTML = `
+        <div class="solve-result-card">
+          <div class="src-eyebrow">Result — Warp Wire Diameter D (Dutch)</div>
+          <div class="solve-result-row">
+            <div>
+              <div class="solve-big">${(D*1000).toFixed(1)}</div>
+              <div class="solve-unit">µm &nbsp;=&nbsp; ${D.toFixed(4)} mm (warp)</div>
+            </div>
+            <div class="solve-divider"></div>
+            <div class="solve-sub-grid">
+              <div class="solve-sub-item"><p>Warp Pitch</p><p>${warpPitch.toFixed(4)} mm</p></div>
+              <div class="solve-sub-item"><p>Warp d/p</p><p>${warpRatio.toFixed(3)} ${warpRatio<=0.5?'✅':'⚠️'}</p></div>
+              <div class="solve-sub-item"><p>Weft d/p</p><p>${weftRatio.toFixed(3)}</p></div>
+              <div class="solve-sub-item"><p>Thickness</p><p>${thickness.toFixed(3)} mm</p></div>
+              <div class="solve-sub-item"><p>Dutch Const.</p><p>${constant.toFixed(3)}</p></div>
+              <div class="solve-sub-item"><p>Opening ✓</p><p>${verifyOpening.toFixed(1)} µm</p></div>
+            </div>
+          </div>
+          <div style="margin-top:12px;padding:8px 12px;border-radius:7px;font-size:0.78rem;font-weight:600;
+            background:${feas.bg};color:${feas.color};border:1px solid ${feas.color}33;">
+            ${feas.label} &nbsp;·&nbsp; Warp d/p = ${warpRatio.toFixed(3)}
+          </div>
+        </div>
+        <div class="solve-result-card">
+          <div class="src-eyebrow">Nearest Standard Warp Wire Diameters</div>
+          ${nearestDiaSuggestions(D, wm, openingMicron, true, d, wf)}
+        </div>`;
+    }
+  }
+
+  document.getElementById('reverseResults').innerHTML = resultsHTML;
+}
+
+// ── NEAREST SUGGESTIONS ──
+
+function nearestMeshSuggestions(calcMesh, D, targetOpeningMicron, isDutch, d, wf) {
+  const candidates = STD_MESHES.slice();
   candidates.sort((a, b) => Math.abs(a - calcMesh) - Math.abs(b - calcMesh));
   const top3 = candidates.slice(0, 3);
 
   return top3.map(m => {
-    const pitch = 25.4 / m;
-    const actualOpening = (pitch - D) * 1000;
-    const ratio = D / pitch;
+    let actualOpening, ratio;
+    if (isDutch) {
+      actualOpening = dutchOpeningCheck(m, D, d);
+      ratio = D / (25.4 / m);
+    } else {
+      const pitch = 25.4 / m;
+      actualOpening = (pitch - D) * 1000;
+      ratio = D / pitch;
+    }
     const diff = actualOpening - targetOpeningMicron;
     const diffStr = (diff >= 0 ? '+' : '') + diff.toFixed(0);
-    const active = m === Math.round(calcMesh) || Math.abs(m - calcMesh) < 0.5;
+    const active = Math.abs(m - calcMesh) < 0.5;
+    const ratioTag = isDutch ? ` · warp d/p ${ratio.toFixed(3)} ${ratio<=0.5?'✅':'⚠️'}` : '';
     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;
-      margin-bottom:6px; border-radius:8px; border:1px solid ${active ? 'var(--blue-border)' : 'var(--border)'};
-      background:${active ? 'var(--blue-light)' : 'var(--bg)'};">
+      margin-bottom:6px; border-radius:8px; border:1px solid ${active?'var(--blue-border)':'var(--border)'};
+      background:${active?'var(--blue-light)':'var(--bg)'};">
       <div>
         <span style="font-weight:700;font-family:'DM Mono',monospace;font-size:0.9rem;">${m} mesh</span>
-        <span style="font-size:0.72rem;color:var(--text-muted);margin-left:10px;">→ ${Math.max(0, actualOpening).toFixed(0)} µm opening</span>
+        <span style="font-size:0.72rem;color:var(--text-muted);margin-left:8px;">→ ${Math.max(0,actualOpening).toFixed(0)} µm${ratioTag}</span>
       </div>
-      <span style="font-size:0.72rem;font-weight:600;color:${diff >= 0 ? 'var(--green)' : 'var(--red)'};">${diffStr} µm</span>
+      <span style="font-size:0.72rem;font-weight:600;color:${diff>=0?'var(--green)':'var(--red)'};">${diffStr} µm</span>
     </div>`;
   }).join('');
 }
 
-function nearestDiaSuggestions(calcD, mesh, targetOpeningMicron) {
+function nearestDiaSuggestions(calcD, mesh, targetOpeningMicron, isDutch, d, wf) {
   const candidates = STD_DIAMETERS.slice();
   candidates.sort((a, b) => Math.abs(a - calcD) - Math.abs(b - calcD));
-  const top3 = candidates.slice(0, 3);
+  const top3 = candidates.filter(v => !isDutch || v > (d||0)).slice(0, 3);
 
   return top3.map(D => {
-    const pitch = 25.4 / mesh;
-    const actualOpening = (pitch - D) * 1000;
+    let actualOpening, ratio;
+    if (isDutch) {
+      actualOpening = dutchOpeningCheck(mesh, D, d);
+      ratio = D / (25.4 / mesh);
+    } else {
+      const pitch = 25.4 / mesh;
+      actualOpening = (pitch - D) * 1000;
+      ratio = D / pitch;
+    }
     const diff = actualOpening - targetOpeningMicron;
     const diffStr = (diff >= 0 ? '+' : '') + diff.toFixed(0);
     const active = Math.abs(D - calcD) < 0.001;
+    const ratioTag = isDutch ? ` · d/p ${ratio.toFixed(3)} ${ratio<=0.5?'✅':'⚠️'}` : '';
     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;
-      margin-bottom:6px; border-radius:8px; border:1px solid ${active ? 'var(--blue-border)' : 'var(--border)'};
-      background:${active ? 'var(--blue-light)' : 'var(--bg)'};">
+      margin-bottom:6px; border-radius:8px; border:1px solid ${active?'var(--blue-border)':'var(--border)'};
+      background:${active?'var(--blue-light)':'var(--bg)'};">
       <div>
         <span style="font-weight:700;font-family:'DM Mono',monospace;font-size:0.9rem;">${D.toFixed(3)} mm</span>
-        <span style="font-size:0.72rem;color:var(--text-muted);margin-left:10px;">→ ${Math.max(0, actualOpening).toFixed(0)} µm opening</span>
+        <span style="font-size:0.72rem;color:var(--text-muted);margin-left:8px;">→ ${Math.max(0,actualOpening).toFixed(0)} µm${ratioTag}</span>
       </div>
-      <span style="font-size:0.72rem;font-weight:600;color:${diff >= 0 ? 'var(--green)' : 'var(--red)'};">${diffStr} µm</span>
+      <span style="font-size:0.72rem;font-weight:600;color:${diff>=0?'var(--green)':'var(--red)'};">${diffStr} µm</span>
     </div>`;
   }).join('');
+}
+
+// ── QUICK EXAMPLE LOADER ──
+function rLoadSample(s) {
+  document.getElementById('rWeaveType').value = s.weave;
+  document.getElementById('rOpening').value   = s.opening;
+  onReverseWeaveChange();
+  selectUnknown(s.unknown);
+
+  const isDutch = (s.weave === 'plain_dutch' || s.weave === 'twill_dutch');
+  if (!isDutch) {
+    if (s.unknown === 'mesh' && s.D) document.getElementById('rWarpDia').value  = s.D;
+    if (s.unknown === 'diameter' && s.mesh) document.getElementById('rWarpMesh').value = s.mesh;
+  } else {
+    if (s.unknown === 'mesh') {
+      if (s.D)  document.getElementById('rDutchD').value        = s.D;
+      if (s.d)  document.getElementById('rDutchd').value        = s.d;
+      if (s.wf) document.getElementById('rDutchWeftMesh').value = s.wf;
+    } else {
+      if (s.wm) document.getElementById('rDutchWarpMesh').value  = s.wm;
+      if (s.d)  document.getElementById('rDutchdKnown').value    = s.d;
+      if (s.wf) document.getElementById('rDutchWeftMesh2').value = s.wf;
+    }
+  }
+  calculateReverse();
 }
 
 function showReverseError(msg) {
@@ -525,10 +775,16 @@ function showReverseError(msg) {
 }
 
 function resetReverse() {
-  ['rOpening','rWarpDia','rWarpMesh'].forEach(id => document.getElementById(id).value = '');
+  ['rOpening','rWarpDia','rWarpMesh',
+   'rDutchD','rDutchd','rDutchWeftMesh',
+   'rDutchWarpMesh','rDutchdKnown','rDutchWeftMesh2'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
   document.getElementById('reverseResults').innerHTML = '';
 }
 
 // ── INIT ──
 onWeaveChange();
+onReverseWeaveChange();
 selectUnknown('mesh');
