@@ -323,6 +323,17 @@ body {
 }
 .value.animating { animation: rollUp 0.7s cubic-bezier(.22,.68,0,1.2) forwards; }
 
+/* ── MICRON EXPLORER ── */
+.micron-explorer-card .solve-result-card { box-shadow: none; }
+.micron-explorer-card .solve-big,
+.micron-explorer-card .solve-sub-item p,
+.micron-explorer-card .src-eyebrow,
+.micron-explorer-card .solve-unit {
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+}
+.micron-explorer-card .solve-big { font-weight: 700; }
+
 /* ── RESPONSIVE ── */
 @media (max-width: 900px) {
   .dashboard { grid-template-columns: 1fr; }

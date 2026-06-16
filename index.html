@@ -266,6 +266,24 @@
           <div class="summary-grid" id="summaryGrid"></div>
         </div>
 
+        <!-- MICRON EXPLORER CARD -->
+        <div class="card micron-explorer-card">
+          <div class="card-header">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+            </svg>
+            <h2>Micron Explorer — Find All Weave Combinations for a Target Opening</h2>
+          </div>
+          <div class="card-body">
+            <div class="input-group" style="max-width:280px;">
+              <label for="micronInput">Target Opening (µm / micron)</label>
+              <input type="number" id="micronInput" placeholder="e.g. 100" oninput="onMicronInput()" />
+              <div class="hint">Enter a micron value to see feasible mesh + wire diameter combinations across Plain, Twill and Dutch weaves.</div>
+            </div>
+            <div id="micronResultsWrap"></div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>

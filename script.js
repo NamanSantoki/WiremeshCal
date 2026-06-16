@@ -784,6 +784,220 @@ function resetReverse() {
   document.getElementById('reverseResults').innerHTML = '';
 }
 
+// ──────────────────────────────────────────────────────────
+// ── MICRON EXPLORER ──
+// Given a target opening (µm), scan standard mesh counts and
+// standard wire diameters to find feasible combinations across
+// Plain, Twill, Plain Dutch and Twill Dutch weaves.
+// ──────────────────────────────────────────────────────────
+
+let micronDebounce = null;
+
+function onMicronInput() {
+  clearTimeout(micronDebounce);
+  micronDebounce = setTimeout(runMicronExplorer, 250);
+}
+
+function micronWeaveMeta(type) {
+  return {
+    plain:       { label: 'Plain',       cls: 'plain',       badge: 'badge-plain' },
+    twill:       { label: 'Twill',       cls: 'twill',       badge: 'badge-twill' },
+    plain_dutch: { label: 'Plain Dutch', cls: 'plain_dutch', badge: 'badge-plain-dutch' },
+    twill_dutch: { label: 'Twill Dutch', cls: 'twill_dutch', badge: 'badge-twill-dutch' }
+  }[type];
+}
+
+// Scan square weaves (plain / twill): pitch = opening + D, mesh = 25.4/pitch.
+// For each standard diameter, find nearest standard mesh and re-derive the
+// actual opening that mesh+dia combo gives, then classify by d/p ratio.
+function scanSquareWeaves(openingMicron) {
+  const openingMm = openingMicron / 1000;
+  const out = [];
+
+  STD_DIAMETERS.forEach(D => {
+    const idealPitch = openingMm + D;
+    if (idealPitch <= 0) return;
+    const idealMesh = 25.4 / idealPitch;
+    if (idealMesh < 4 || idealMesh > 500) return;
+
+    // nearest standard mesh to the ideal one
+    let nearestMesh = STD_MESHES[0];
+    let bestDiff = Infinity;
+    STD_MESHES.forEach(m => {
+      const diff = Math.abs(m - idealMesh);
+      if (diff < bestDiff) { bestDiff = diff; nearestMesh = m; }
+    });
+
+    const pitch = 25.4 / nearestMesh;
+    const actualOpeningUm = (pitch - D) * 1000;
+    if (actualOpeningUm <= 0) return;
+
+    const ratio = D / pitch;
+    const weave = ratio <= 0.5 ? 'plain' : (ratio <= 0.67 ? 'twill' : null);
+    if (!weave) return; // too tight for square weave at all — skip
+
+    const diffUm = actualOpeningUm - openingMicron;
+    const pctDiff = Math.abs(diffUm) / openingMicron;
+    if (pctDiff > 0.18) return; // keep only reasonably close matches
+
+    out.push({
+      weave, mesh: nearestMesh, wf: nearestMesh, D, d: D,
+      openingUm: actualOpeningUm, ratio, diffUm, pctDiff
+    });
+  });
+
+  return out;
+}
+
+// Scan Dutch weaves: pick a fine weft mesh/dia pair, then solve for warp
+// mesh given a coarse warp diameter, snapping to nearest standard warp mesh.
+function scanDutchWeaves(openingMicron) {
+  const openingMm = openingMicron / 1000;
+  const out = [];
+
+  // Candidate weft (fine) diameters — must be noticeably finer than warp.
+  const weftCandidates = STD_DIAMETERS.filter(d => d <= 0.5);
+
+  STD_DIAMETERS.forEach(D => {
+    weftCandidates.forEach(d => {
+      if (D <= d * 1.15) return; // warp must be meaningfully thicker than weft
+      if (D <= openingMm) return; // Dutch geometry requires D > opening
+
+      const idealWm = dutchReverseWarpMesh(openingMm, D, d);
+      if (!idealWm || idealWm < 4 || idealWm > 500) return;
+
+      let nearestWm = STD_MESHES[0];
+      let bestDiff = Infinity;
+      STD_MESHES.forEach(m => {
+        const diff = Math.abs(m - idealWm);
+        if (diff < bestDiff) { bestDiff = diff; nearestWm = m; }
+      });
+
+      // pick a plausible fine weft mesh: dense enough to pack against warp pitch
+      const warpPitch = 25.4 / nearestWm;
+      const warpRatio = D / warpPitch;
+      let wf = Math.round((25.4 / (d * 2.1)) / 5) * 5; // rough packed estimate
+      if (!isFinite(wf) || wf <= 0) wf = nearestWm * 2;
+      let nearestWf = STD_MESHES.reduce((best, m) =>
+        Math.abs(m - wf) < Math.abs(best - wf) ? m : best, STD_MESHES[0]);
+
+      const actualOpeningUm = dutchOpeningCheck(nearestWm, D, d);
+      if (actualOpeningUm <= 0) return;
+
+      const diffUm = actualOpeningUm - openingMicron;
+      const pctDiff = Math.abs(diffUm) / openingMicron;
+      if (pctDiff > 0.18) return;
+
+      const weave = warpRatio <= 0.5 ? 'plain_dutch' : 'twill_dutch';
+
+      out.push({
+        weave, mesh: nearestWm, wf: nearestWf, D, d,
+        openingUm: actualOpeningUm, ratio: warpRatio, diffUm, pctDiff
+      });
+    });
+  });
+
+  return out;
+}
+
+function dedupeAndRank(results, openingMicron) {
+  // Dedup by weave+mesh+D rounded, keep closest match per key
+  const map = new Map();
+  results.forEach(r => {
+    const key = `${r.weave}|${r.mesh}|${r.D.toFixed(3)}`;
+    const existing = map.get(key);
+    if (!existing || Math.abs(r.diffUm) < Math.abs(existing.diffUm)) map.set(key, r);
+  });
+  const deduped = Array.from(map.values());
+  deduped.sort((a, b) => Math.abs(a.diffUm) - Math.abs(b.diffUm));
+  return deduped;
+}
+
+function pickDiverseTop(results, count) {
+  // Try to surface a mix of weave types rather than one type dominating.
+  const byType = { plain: [], twill: [], plain_dutch: [], twill_dutch: [] };
+  results.forEach(r => byType[r.weave].push(r));
+  Object.keys(byType).forEach(k => byType[k].sort((a, b) => Math.abs(a.diffUm) - Math.abs(b.diffUm)));
+
+  const picked = [];
+  const types = ['plain', 'twill', 'plain_dutch', 'twill_dutch'];
+  let round = 0;
+  while (picked.length < count) {
+    let addedAny = false;
+    for (const t of types) {
+      if (picked.length >= count) break;
+      if (byType[t][round]) { picked.push(byType[t][round]); addedAny = true; }
+    }
+    round++;
+    if (!addedAny) break;
+  }
+  picked.sort((a, b) => Math.abs(a.diffUm) - Math.abs(b.diffUm));
+  return picked;
+}
+
+function renderMicronCard(r, openingMicron) {
+  const meta = micronWeaveMeta(r.weave);
+  const isDutch = r.weave === 'plain_dutch' || r.weave === 'twill_dutch';
+  const diffStr = (r.diffUm >= 0 ? '+' : '') + r.diffUm.toFixed(1);
+  const diffColor = Math.abs(r.diffUm) <= openingMicron * 0.05 ? 'var(--green)' : 'var(--amber)';
+  const ratioOk = r.ratio <= (r.weave === 'twill' ? 0.67 : 0.5) || isDutch;
+
+  return `
+    <div class="solve-result-card" style="margin-bottom:12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div class="src-eyebrow" style="margin-bottom:0;">${meta.label} Weave</div>
+        <span class="sample-badge ${meta.badge}">${meta.label.toUpperCase()}</span>
+      </div>
+      <div class="solve-result-row">
+        <div>
+          <div class="solve-big" style="font-size:1.6rem;">${r.openingUm.toFixed(1)}</div>
+          <div class="solve-unit">µm actual opening &nbsp;(target ${openingMicron} µm)</div>
+        </div>
+        <div class="solve-divider"></div>
+        <div class="solve-sub-grid">
+          <div class="solve-sub-item"><p>${isDutch ? 'Warp Mesh' : 'Mesh'}</p><p>${r.mesh} /in</p></div>
+          ${isDutch ? `<div class="solve-sub-item"><p>Weft Mesh</p><p>${r.wf} /in</p></div>` : ''}
+          <div class="solve-sub-item"><p>${isDutch ? 'Warp Dia D' : 'Wire Dia'}</p><p>${r.D.toFixed(3)} mm</p></div>
+          ${isDutch ? `<div class="solve-sub-item"><p>Weft Dia d</p><p>${r.d.toFixed(3)} mm</p></div>` : ''}
+          <div class="solve-sub-item"><p>${isDutch ? 'Warp d/p' : 'd/p Ratio'}</p><p>${r.ratio.toFixed(3)} ${ratioOk ? '✅' : '⚠️'}</p></div>
+          <div class="solve-sub-item"><p>Δ vs Target</p><p style="color:${diffColor};">${diffStr} µm</p></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function runMicronExplorer() {
+  const wrap = document.getElementById('micronResultsWrap');
+  const val = parseFloat(document.getElementById('micronInput').value) || 0;
+
+  if (val <= 0) { wrap.innerHTML = ''; return; }
+
+  const square = scanSquareWeaves(val);
+  const dutch  = scanDutchWeaves(val);
+  const all = dedupeAndRank([...square, ...dutch], val);
+
+  if (!all.length) {
+    wrap.innerHTML = `
+      <div style="margin-top:16px;padding:16px 18px; border-radius:10px; background:var(--red-light);
+        border:1px solid var(--red-border); color:var(--red); font-size:0.85rem; font-weight:500;">
+        ⚠️ No feasible standard combinations found within ±18% of ${val} µm. Try a different opening size.
+      </div>`;
+    return;
+  }
+
+  const top = pickDiverseTop(all, Math.min(8, Math.max(5, Math.min(8, all.length))));
+
+  wrap.innerHTML = `
+    <div style="margin-top:18px;">
+      <div class="samples-label" style="margin-bottom:12px;">
+        ${top.length} Feasible Combinations for ${val} µm Opening (Plain · Twill · Dutch)
+      </div>
+      <div class="reverse-solve-results" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0;">
+        ${top.map(r => renderMicronCard(r, val)).join('')}
+      </div>
+    </div>`;
+}
+
 // ── INIT ──
 onWeaveChange();
 onReverseWeaveChange();
