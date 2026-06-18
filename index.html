@@ -275,11 +275,24 @@
             <h2>Micron Explorer — Find All Weave Combinations for a Target Opening</h2>
           </div>
           <div class="card-body">
-            <div class="input-group" style="max-width:280px;">
-              <label for="micronInput">Target Opening (µm / micron)</label>
-              <input type="number" id="micronInput" placeholder="e.g. 100" oninput="onMicronInput()" />
-              <div class="hint">Enter a micron value to see feasible mesh + wire diameter combinations across Plain, Twill and Dutch weaves.</div>
+            <div style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin-bottom:4px;">
+              <div class="input-group" style="max-width:200px;margin-bottom:0;">
+                <label for="micronInput">Target Opening (µm)</label>
+                <input type="number" id="micronInput" placeholder="e.g. 180" oninput="onMicronInput()" />
+              </div>
+              <div class="input-group" style="max-width:220px;margin-bottom:0;">
+                <label for="micronWeaveFilter">Weave Type to Show</label>
+                <div class="select-wrap">
+                  <select id="micronWeaveFilter" onchange="onMicronInput()">
+                    <option value="plain">Plain Weave</option>
+                    <option value="twill">Twill Weave</option>
+                    <option value="plain_dutch">Plain Dutch Weave</option>
+                    <option value="twill_dutch">Twill Dutch Weave</option>
+                  </select>
+                </div>
+              </div>
             </div>
+            <div class="hint" style="margin-bottom:12px;">Shows nearest match + 4 options above &amp; 5 below (Mesh step: 10, Dia step: 0.01 mm). Only the selected weave type is shown.</div>
             <div id="micronResultsWrap"></div>
           </div>
         </div>

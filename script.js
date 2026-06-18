@@ -785,25 +785,180 @@ function resetReverse() {
 }
 
 // ──────────────────────────────────────────────────────────
-// ── MICRON EXPLORER ──
-// Given a target opening (µm), scan standard mesh counts and
-// standard wire diameters to find feasible combinations across
-// Plain, Twill, Plain Dutch and Twill Dutch weaves.
+// ── MICRON EXPLORER (v2) ──
+// Table-driven: uses the exact reference data from the
+// Plain/Twill Weave Possibility table (images uploaded).
+// For a target opening the user picks a weave type; we show
+// the nearest row + 4 above + 5 below (step 10 in mesh, 0.01 in dia).
 // ──────────────────────────────────────────────────────────
+
+// ── Reference table: [mesh, dia_mm, weave_type]
+// Exactly as shown in the uploaded Plain/Twill reference table.
+const MICRON_REF_TABLE = [
+  [500, 0.025, 'twill'],
+  [400, 0.030, 'twill'],
+  [300, 0.040, 'twill'],
+  [250, 0.040, 'twill'],
+  [200, 0.050, 'plain'],
+  [170, 0.050, 'plain'],
+  [150, 0.060, 'plain'],
+  [140, 0.070, 'plain'],
+  [130, 0.080, 'plain'],
+  [120, 0.080, 'plain'],
+  [110, 0.090, 'plain'],
+  [100, 0.100, 'plain'],
+  [90,  0.110, 'plain'],
+  [80,  0.120, 'plain'],
+  [70,  0.140, 'plain'],
+  [60,  0.150, 'plain'],
+  [50,  0.190, 'plain'],
+  [40,  0.220, 'plain'],
+  [30,  0.300, 'plain'],
+  [20,  0.450, 'plain'],
+  [18,  0.450, 'plain'],
+  [16,  0.450, 'plain'],
+  [14,  0.450, 'plain'],
+  [12,  0.500, 'plain'],
+  [10,  0.500, 'plain'],
+];
+
+// Compute micron opening for plain/twill: (pitch - D) * 1000
+function computeOpeningUm(mesh, diaMm) {
+  const pitch = 25.4 / mesh;
+  return Math.round((pitch - diaMm) * 1000);
+}
+
+// ── FULLY MATHEMATICAL GRID BUILDER ──
+// For any target micron, we:
+// 1. Mathematically find the ideal mesh for the target opening, given an ideal dia
+//    that keeps d/p in the correct range for the weave type.
+// 2. Generate a continuous grid of rows stepping mesh by 10 and dia by 0.01
+//    centered on the truly nearest combo, NOT just anchored to the reference table.
+//
+// For plain:       d/p must be <= 0.50  → dia = pitch * 0.45 (midpoint)
+// For twill:       d/p in 0.50–0.67    → dia = pitch * 0.58
+// For plain_dutch: d/p <= 0.50         → dia = pitch * 0.45
+// For twill_dutch: d/p > 0.50          → dia = pitch * 0.58
+//
+// opening = pitch - dia  →  pitch = opening + dia
+// pitch = 25.4 / mesh    →  mesh = 25.4 / pitch
+
+// d/p target ratio per weave
+const WEAVE_DP = {
+  plain:       0.45,
+  twill:       0.58,
+  plain_dutch: 0.45,
+  twill_dutch: 0.60
+};
+
+// d/p feasibility range per weave
+const WEAVE_DP_RANGE = {
+  plain:       [0,    0.50],
+  twill:       [0.50, 0.67],
+  plain_dutch: [0,    0.50],
+  twill_dutch: [0.50, 1.00]
+};
+
+// Given a mesh count and weave type, derive ideal dia to sit in the correct d/p range,
+// then compute the opening. Returns {mesh, dia, openingUm, weave, isSynthetic}.
+function rowForMesh(mesh, weaveFilter) {
+  const pitch = 25.4 / mesh;
+  const dpTarget = WEAVE_DP[weaveFilter];
+  // Ideal dia = pitch * dpTarget, rounded to nearest 0.01 mm
+  let dia = Math.round(pitch * dpTarget * 100) / 100;
+  if (dia < 0.010) dia = 0.010;
+
+  const openingUm = computeOpeningUm(mesh, dia);
+  if (openingUm <= 0) return null;
+
+  const dp = dia / pitch;
+  const [dpMin, dpMax] = WEAVE_DP_RANGE[weaveFilter];
+  // Allow slight tolerance outside range
+  if (dp > dpMax + 0.05 || dp < dpMin - 0.05) return null;
+
+  return { mesh, dia, openingUm, weave: weaveFilter, isNearest: false, isSynthetic: true };
+}
+
+// Build a full 10-row grid (4 above + nearest + 5 below) centered on the
+// truly nearest mesh to the target opening. All rows computed mathematically.
+function buildMicronGrid(targetUm, weaveFilter) {
+  const targetMm = targetUm / 1000;
+  const dpTarget = WEAVE_DP[weaveFilter];
+
+  // Ideal pitch for target: opening = pitch - dia = pitch - pitch*dp = pitch*(1-dp)
+  // pitch = targetMm / (1 - dpTarget)
+  const idealPitch = targetMm / (1 - dpTarget);
+  const idealMesh  = 25.4 / idealPitch;
+
+  // Snap to nearest multiple of 10
+  const nearestMesh10 = Math.round(idealMesh / 10) * 10;
+
+  // Build 20 candidate meshes centered on nearestMesh10 (step 10) and find actual nearest
+  const candidates = [];
+  for (let step = -10; step <= 10; step++) {
+    const m = nearestMesh10 + step * 10;
+    if (m <= 0) continue;
+    const row = rowForMesh(m, weaveFilter);
+    if (row) candidates.push(row);
+  }
+
+  if (!candidates.length) return [];
+
+  // Find the one whose openingUm is closest to target
+  candidates.sort((a, b) => Math.abs(a.openingUm - targetUm) - Math.abs(b.openingUm - targetUm));
+  const nearestRow = { ...candidates[0], isNearest: true };
+
+  // Now build 4 above (larger mesh = smaller opening) and 5 below (smaller mesh = larger opening)
+  // stepping by 10 each from the nearest mesh
+  const aboveSlots = [];
+  for (let i = 1; i <= 4; i++) {
+    const m = nearestRow.mesh + i * 10; // higher mesh → smaller opening
+    const row = rowForMesh(m, weaveFilter);
+    if (row) aboveSlots.unshift(row); // unshift so smallest opening is first
+  }
+
+  const belowSlots = [];
+  for (let i = 1; i <= 5; i++) {
+    const m = nearestRow.mesh - i * 10; // lower mesh → larger opening
+    if (m <= 0) break;
+    const row = rowForMesh(m, weaveFilter);
+    if (row) belowSlots.push(row);
+  }
+
+  // Overlay reference table rows: if reference has a row at the same mesh, prefer it
+  const refMap = new Map();
+  MICRON_REF_TABLE
+    .filter(r => r[2] === weaveFilter)
+    .forEach(r => refMap.set(r[0], { mesh: r[0], dia: r[1], openingUm: computeOpeningUm(r[0], r[1]), weave: r[2], isNearest: false, isSynthetic: false }));
+
+  const applyRef = rows => rows.map(r => refMap.has(r.mesh) ? { ...refMap.get(r.mesh), isNearest: r.isNearest } : r);
+
+  const allRows = applyRef([...aboveSlots, nearestRow, ...belowSlots]);
+
+  // Re-find nearest after ref overlay (dia may have changed openingUm)
+  let nearestIdx = 0, nearestDiff = Infinity;
+  allRows.forEach((r, i) => {
+    const d = Math.abs(r.openingUm - targetUm);
+    if (d < nearestDiff) { nearestDiff = d; nearestIdx = i; }
+  });
+  allRows.forEach((r, i) => r.isNearest = (i === nearestIdx));
+
+  return allRows;
+}
 
 let micronDebounce = null;
 
 function onMicronInput() {
   clearTimeout(micronDebounce);
-  micronDebounce = setTimeout(runMicronExplorer, 250);
+  micronDebounce = setTimeout(runMicronExplorer, 200);
 }
 
 function micronWeaveMeta(type) {
   return {
-    plain:       { label: 'Plain',       cls: 'plain',       badge: 'badge-plain' },
-    twill:       { label: 'Twill',       cls: 'twill',       badge: 'badge-twill' },
-    plain_dutch: { label: 'Plain Dutch', cls: 'plain_dutch', badge: 'badge-plain-dutch' },
-    twill_dutch: { label: 'Twill Dutch', cls: 'twill_dutch', badge: 'badge-twill-dutch' }
+    plain:       { label: 'Plain',       cls: 'plain',       badge: 'badge-plain',       color: 'var(--blue)',   bg: 'var(--blue-light)',   border: 'var(--blue-border)' },
+    twill:       { label: 'Twill',       cls: 'twill',       badge: 'badge-twill',       color: 'var(--amber)',  bg: 'var(--amber-light)',  border: 'var(--amber-border)' },
+    plain_dutch: { label: 'Plain Dutch', cls: 'plain_dutch', badge: 'badge-plain-dutch', color: 'var(--green)',  bg: 'var(--green-light)',  border: 'var(--green-border)' },
+    twill_dutch: { label: 'Twill Dutch', cls: 'twill_dutch', badge: 'badge-twill-dutch', color: '#6d28d9',       bg: '#f5f3ff',             border: '#ddd6fe' }
   }[type];
 }
 
@@ -969,31 +1124,78 @@ function renderMicronCard(r, openingMicron) {
 function runMicronExplorer() {
   const wrap = document.getElementById('micronResultsWrap');
   const val = parseFloat(document.getElementById('micronInput').value) || 0;
+  const weaveFilter = document.getElementById('micronWeaveFilter').value;
 
   if (val <= 0) { wrap.innerHTML = ''; return; }
 
-  const square = scanSquareWeaves(val);
-  const dutch  = scanDutchWeaves(val);
-  const all = dedupeAndRank([...square, ...dutch], val);
+  const meta = micronWeaveMeta(weaveFilter);
+  const rows = buildMicronGrid(val, weaveFilter);
 
-  if (!all.length) {
-    wrap.innerHTML = `
-      <div style="margin-top:16px;padding:16px 18px; border-radius:10px; background:var(--red-light);
-        border:1px solid var(--red-border); color:var(--red); font-size:0.85rem; font-weight:500;">
-        ⚠️ No feasible standard combinations found within ±18% of ${val} µm. Try a different opening size.
-      </div>`;
+  if (!rows.length) {
+    wrap.innerHTML = `<div style="margin-top:14px;padding:14px 18px;border-radius:10px;
+      background:var(--red-light);border:1px solid var(--red-border);color:var(--red);
+      font-size:0.85rem;font-weight:500;">
+      ⚠️ No reference combinations found for <strong>${meta.label}</strong> weave. Try Plain or Twill.
+    </div>`;
     return;
   }
 
-  const top = pickDiverseTop(all, Math.min(8, Math.max(5, Math.min(8, all.length))));
+  const nearestRow = rows.find(r => r.isNearest) || rows[0];
+
+  // Build table rows HTML
+  const rowsHTML = rows.map(r => {
+    const isNearest = r.isNearest;
+    const isSynthetic = r.isSynthetic;
+    const diffUm = r.openingUm - val;
+    const diffStr = (diffUm === 0 ? '±0' : (diffUm > 0 ? '+' : '') + diffUm.toFixed(0)) + ' µm';
+    const diffColor = diffUm === 0 ? 'var(--green)' : Math.abs(diffUm) <= val * 0.08 ? 'var(--green)' : 'var(--amber)';
+    const ratio = (r.dia / (25.4 / r.mesh)).toFixed(3);
+    const rowStyle = isNearest
+      ? `background:${meta.bg};border-left:3px solid ${meta.color};font-weight:700;`
+      : isSynthetic ? 'border-left:3px solid #e2e8f0;background:#fafbfc;'
+      : 'border-left:3px solid transparent;';
+    return `<tr style="${rowStyle}">
+      <td style="padding:9px 12px;font-family:'DM Mono',monospace;font-size:0.82rem;color:var(--text);">
+        ${isNearest ? '<span style="font-size:0.65rem;font-weight:800;letter-spacing:.06em;color:'+meta.color+';margin-right:4px;">▶ NEAREST</span>' : ''}
+        ${isSynthetic && !isNearest ? '<span style="font-size:0.6rem;color:var(--text-faint);margin-right:3px;" title="Calculated by stepping mesh±10, dia±0.01 from nearest reference row">~</span>' : ''}
+        ${r.mesh}
+      </td>
+      <td style="padding:9px 12px;font-family:'DM Mono',monospace;font-size:0.82rem;color:var(--text);">${r.dia.toFixed(3)}</td>
+      <td style="padding:9px 12px;font-family:'DM Mono',monospace;font-size:0.875rem;color:var(--text);font-weight:${isNearest?'700':'500'};">${r.openingUm}</td>
+      <td style="padding:9px 12px;font-size:0.78rem;font-weight:600;color:${diffColor};">${diffStr}</td>
+      <td style="padding:9px 12px;"><span class="sample-badge ${meta.badge}" style="font-size:0.6rem;">${meta.label.toUpperCase()}</span></td>
+      <td style="padding:9px 12px;font-family:'DM Mono',monospace;font-size:0.75rem;color:var(--text-muted);">${ratio}</td>
+    </tr>`;
+  }).join('');
 
   wrap.innerHTML = `
-    <div style="margin-top:18px;">
-      <div class="samples-label" style="margin-bottom:12px;">
-        ${top.length} Feasible Combinations for ${val} µm Opening (Plain · Twill · Dutch)
+    <div style="margin-top:16px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+        <div class="samples-label" style="margin-bottom:0;">
+          ${rows.length} combinations · <strong>${meta.label} Weave</strong> · Target: <strong>${val} µm</strong>
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-faint);">Nearest: Mesh ${nearestRow.mesh}, Dia ${nearestRow.dia.toFixed(3)} mm → ${nearestRow.openingUm} µm</div>
       </div>
-      <div class="reverse-solve-results" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0;">
-        ${top.map(r => renderMicronCard(r, val)).join('')}
+      <div style="overflow-x:auto;border-radius:10px;border:1px solid var(--border);">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="background:var(--bg);border-bottom:1px solid var(--border);">
+              <th style="padding:9px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);">Mesh (/in)</th>
+              <th style="padding:9px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);">Dia (mm)</th>
+              <th style="padding:9px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);">Opening (µm)</th>
+              <th style="padding:9px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);">Δ vs Target</th>
+              <th style="padding:9px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);">Weave</th>
+              <th style="padding:9px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);">d/p Ratio</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHTML}
+          </tbody>
+        </table>
+      </div>
+      <div class="hint" style="margin-top:10px;">
+        ▶ Highlighted row is the closest match to ${val} µm. Rows above have smaller openings; rows below have larger openings.
+        d/p ≤ 0.50 = Plain feasible · d/p ≤ 0.67 = Twill feasible.
       </div>
     </div>`;
 }
